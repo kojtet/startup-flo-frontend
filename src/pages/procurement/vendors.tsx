@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/apis';
+import { api } from '@/apis';
 import type { Vendor, VendorCategory, CreateVendorData, UpdateVendorData } from '@/apis/types';
 import {
   Store,
@@ -278,7 +278,13 @@ export default function VendorsDirectoryPage() {
       <ExtensibleLayout
         moduleSidebar={procurementSidebarSections}
         moduleTitle="Procurement"
-        user={user}
+        user={{
+          name: user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : '',
+          email: user?.email || '',
+          role: user?.role || '',
+          avatarUrl: user?.avatar_url,
+          companyId: user?.company_id
+        }}
       >
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
@@ -291,7 +297,13 @@ export default function VendorsDirectoryPage() {
     <ExtensibleLayout
       moduleSidebar={procurementSidebarSections}
       moduleTitle="Procurement"
-      user={user}
+      user={{
+        name: user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : '',
+        email: user?.email || '',
+        role: user?.role || '',
+        avatarUrl: user?.avatar_url,
+        companyId: user?.company_id
+      }}
     >
       <div className="space-y-6">
         {/* Header */}

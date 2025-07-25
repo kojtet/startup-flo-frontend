@@ -2,17 +2,28 @@ import { ExtensibleLayout } from "@/components/layout/ExtensibleLayout";
 import { financeSidebarSections } from "@/components/sidebars/FinanceSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, CreditCard, PieChart } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function FinanceDashboard() {
-  const user = {
-    name: "John Doe",
-    email: "john.doe@company.com",
-    role: "Administrator",
+  const { user: authUser } = useAuth();
+
+  // Transform auth user to layout user format
+  const user = authUser ? {
+    name: authUser.first_name && authUser.last_name 
+      ? `${authUser.first_name} ${authUser.last_name}` 
+      : authUser.email,
+    email: authUser.email,
+    role: authUser.role || 'User',
+    avatarUrl: authUser.avatar_url || undefined
+  } : {
+    name: '',
+    email: '',
+    role: '',
     avatarUrl: undefined
   };
 
   return (
-    <ExtensibleLayout moduleSidebar={financeSidebarSections} moduleTitle="Finance & Accounting" user={user}>
+    <ExtensibleLayout moduleSidebar={financeSidebarSections} moduleTitle="Finance & Accounting" >
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Finance Dashboard</h1>

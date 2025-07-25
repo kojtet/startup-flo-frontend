@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/apis";
 import type { Asset, AssetSummaryReport, AssetMaintenance } from "@/apis/types";
 import { Archive, DollarSign, Wrench, TrendingDown, Loader2, Users, Building, AlertTriangle, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { transformUserForLayout } from '@/lib/utils';
 
 export default function AssetsDashboard() {
   const { user } = useAuth();
@@ -105,6 +106,7 @@ export default function AssetsDashboard() {
   };
 
   const getMaintenanceStatusIcon = (status: AssetMaintenance['status']) => {
+    console.log('Maintenance status:', status);
     switch (status) {
       case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'in_progress': return <Clock className="h-4 w-4 text-blue-500" />;
@@ -127,7 +129,11 @@ export default function AssetsDashboard() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={user}>
+    <ExtensibleLayout 
+      moduleSidebar={assetsSidebarSections} 
+      moduleTitle="Asset Management" 
+      user={transformUserForLayout(user)}
+    >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

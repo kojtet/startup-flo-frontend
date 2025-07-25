@@ -1,6 +1,5 @@
+import React from 'react';
 import { useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SidebarProvider } from "@/components/ui/sidebar-provider";
 import { ExtensibleSidebar, SidebarSection } from "@/components/ui/extensible-sidebar";
 import { Navbar } from "./Navbar";
@@ -14,27 +13,18 @@ import {
   ShoppingCart,
   FileArchive,
   GitPullRequest,
-  Settings as SettingsIcon,
-  Crown
+  Settings as SettingsIcon
 } from "lucide-react";
 
 interface ExtensibleLayoutProps {
   children: React.ReactNode;
   moduleSidebar?: SidebarSection[];
   moduleTitle?: string;
-  user: {
-    name: string;
-    email: string;
-    role: string;
-    avatarUrl?: string;
-    companyId?: string;
-  };
   // Removed onBackToMain prop
 }
 
-function LayoutContent({ children, moduleSidebar, moduleTitle, user }: ExtensibleLayoutProps) {
+function LayoutContent({ children, moduleSidebar, moduleTitle }: ExtensibleLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { shouldShowUpgrade } = useSubscription();
 
   const handleMobileMenuToggle = () => {
     setMobileSidebarOpen(!mobileSidebarOpen);
@@ -43,7 +33,7 @@ function LayoutContent({ children, moduleSidebar, moduleTitle, user }: Extensibl
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Global Header - Fixed and covers everything with proper spacing */}
-      <Navbar onMobileMenuToggle={handleMobileMenuToggle} user={user} />
+      <Navbar onMobileMenuToggle={handleMobileMenuToggle} />
 
       {/* Main Sidebar - Always visible on desktop, fixed width */}
       <div className={`${mobileSidebarOpen ? "block" : "hidden"} md:block pt-[60px]`}>
@@ -62,19 +52,8 @@ function LayoutContent({ children, moduleSidebar, moduleTitle, user }: Extensibl
                 { label: "Approvals", href: "/approval-flows", icon: GitPullRequest },
                 { label: "Settings", href: "/settings", icon: SettingsIcon },
               ]
-            },
-            ...(shouldShowUpgrade ? [{
-              items: [
-                { 
-                  label: "Upgrade", 
-                  href: "/upgrade", 
-                  icon: Crown,
-                  variant: "upgrade" as const
-                }
-              ]
-            }] : [])
+            }
           ]}
-          // Removed showLogo={false}
           width="sm"
           isMainSidebar={true}
         />

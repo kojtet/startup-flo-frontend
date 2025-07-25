@@ -86,7 +86,6 @@ interface EmployeeFormData extends Partial<CreateUserData> {
   phone?: string;
   job_title?: string;
   department_id?: string;
-  hire_date?: string;
   is_active: boolean;
 }
 
@@ -178,15 +177,6 @@ const EmployeeForm = ({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="hire-date">Hire Date</Label>
-        <Input
-          id="hire-date"
-          type="date"
-          value={formData.hire_date || ''}
-          onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-        />
-      </div>
     </div>
   </div>
 );
@@ -212,7 +202,6 @@ const EmployeesPage = () => {
     phone: '',
     job_title: '',
     department_id: '',
-    hire_date: '',
     is_active: true,
   });
 
@@ -283,7 +272,6 @@ const EmployeesPage = () => {
         department_id: formData.department_id,
         company_id: companyId,
         role: 'employee',
-        is_active: formData.is_active,
       };
       
       await api.user.createUser(employeeData);
@@ -378,14 +366,13 @@ const EmployeesPage = () => {
   const openEditDialog = (employee: User) => {
     setSelectedEmployee(employee);
     setFormData({
-      first_name: employee.first_name,
-      last_name: employee.last_name,
+      first_name: employee.first_name || '',
+      last_name: employee.last_name || '',
       email: employee.email,
       phone: employee.phone || '',
       job_title: employee.job_title || '',
       department_id: employee.department_id || '',
-      hire_date: employee.hire_date || '',
-      is_active: employee.is_active,
+      is_active: employee.is_active || true,
     });
     setShowEditDialog(true);
   };
@@ -398,7 +385,6 @@ const EmployeesPage = () => {
       phone: '',
       job_title: '',
       department_id: '',
-      hire_date: '',
       is_active: true,
     });
     setSelectedEmployee(null);

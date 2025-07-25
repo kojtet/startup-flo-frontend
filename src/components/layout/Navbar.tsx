@@ -55,19 +55,12 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 
 interface NavbarProps {
   onMobileMenuToggle: () => void;
-  user: {
-    name: string;
-    email: string;
-    role: string;
-    avatarUrl?: string;
-    companyId?: string;
-  } | null;
 }
 
-export function Navbar({ onMobileMenuToggle, user }: NavbarProps) {
+export function Navbar({ onMobileMenuToggle }: NavbarProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { getSubscriptionBadgeInfo } = useSubscription();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -578,17 +571,13 @@ export function Navbar({ onMobileMenuToggle, user }: NavbarProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2 h-9 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                     <Avatar className="h-7 w-7">
-                      {user.avatarUrl ? (
-                        <AvatarImage src={user.avatarUrl} alt={user.name || 'User'} />
-                      ) : (
-                        <AvatarFallback className="bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-medium">
-                          {user.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
-                        </AvatarFallback>
-                      )}
+                      <AvatarFallback className="bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-medium">
+                        {user.email ? user.email.split('@')[0].substring(0, 2).toUpperCase() : 'U'}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="hidden sm:block text-left">
                       <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight truncate max-w-[100px]">
-                        {user.name || 'Unknown User'}
+                        {user.email || 'Unknown User'}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight truncate max-w-[100px]">
                         {user.role || 'User'}
@@ -599,8 +588,8 @@ export function Navbar({ onMobileMenuToggle, user }: NavbarProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64" align="end" forceMount>
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name || 'Unknown User'}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email || 'No email'}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.email || 'Unknown User'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.role || 'User'}</p>
                   </div>
                 
                 <DropdownMenuItem 
@@ -758,7 +747,7 @@ export function Navbar({ onMobileMenuToggle, user }: NavbarProps) {
                   <div className="px-6 py-8 text-center">
                     <Search className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No results found for "{searchQuery}"
+                      No results found for &quot;{searchQuery}&quot;
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                       Try different keywords or check spelling

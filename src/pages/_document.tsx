@@ -15,7 +15,7 @@ export default function Document() {
           data-softgen-monitoring="true"
         />
       </Head>
-      <body className="antialiased">
+      <body className="antialiased" suppressHydrationWarning={true}>
         <Main />
         <NextScript />
       </body>

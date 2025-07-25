@@ -209,7 +209,7 @@ export function InviteTeamStep({ data, updateData, onBack, isLoading, setIsLoadi
         </p>
         {invites.length > 0 && (
           <p className="text-sm text-gray-500">
-            Team invitations will be sent to {invites.length} team member{invites.length > 1 ? 's' : ''} once you're set up.
+            Team invitations will be sent to {invites.length} team member{invites.length > 1 ? "s" : ""} once you&apos;re set up.
           </p>
         )}
         <div className="mt-6">

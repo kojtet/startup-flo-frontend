@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Menu, LogOut, User, Settings, Bell } from "lucide-react";
 import { useRouter } from "next/router";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -13,10 +14,10 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const router = useRouter();
+  const { logout, user } = useAuth();
 
-  const handleLogout = () => {
-    // Since no backend is connected, we'll just redirect to login
-    // In the future, this will handle actual authentication logout
+  const handleLogout = async () => {
+    await logout();
     router.push("/auth/login");
   };
 
@@ -63,15 +64,15 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-gray-100 transition-colors">
                     <Avatar className="h-9 w-9">
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium">
-                        JD
+                        {user?.email ? user.email.split('@')[0].substring(0, 2).toUpperCase() : 'U'}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">John Doe</p>
-                    <p className="text-xs text-gray-500">john.doe@company.com</p>
+                    <p className="text-sm font-medium text-gray-900">{user?.email || 'Unknown User'}</p>
+                    <p className="text-xs text-gray-500">{user?.role || 'User'}</p>
                   </div>
                   <DropdownMenuItem className="flex items-center py-2 hover:bg-gray-50 transition-colors">
                     <User className="mr-3 h-4 w-4 text-gray-500" />

@@ -4,15 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users2, DollarSign, CalendarDays, TrendingUp } from "lucide-react";
 
 export default function HRDashboard() {
-  const user = {
-    name: "John Doe",
-    email: "john.doe@company.com",
-    role: "Administrator",
-    avatarUrl: undefined
-  };
-
   return (
-    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={user}>
+    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">HR Dashboard</h1>

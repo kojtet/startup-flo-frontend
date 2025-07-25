@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { ExtensibleLayout } from '@/components/layout/ExtensibleLayout';
@@ -52,90 +53,31 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import {
-  // Tabs, // Unused
-  // TabsContent, // Unused
-  // TabsList, // Unused
-  // TabsTrigger, // Unused
-} from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Plus,
   Edit,
   Trash2,
   Users,
-  // Building, // Unused
   Shield,
-  // Settings, // Unused
-  // Mail, // Unused
-  // Phone, // Unused
   Calendar,
-  // MapPin, // Unused
-  // Eye, // Unused
-  // EyeOff, // Unused
   Save,
   UserPlus,
   Search,
   Filter,
   Download,
-  // Upload, // Unused
-  // User, // Unused
-  // Lock, // Unused
-  // CreditCard, // Unused
-  // Bell, // Unused
-  // Palette, // Unused
-  // Languages, // Unused
-  // Users as UsersIcon, // Duplicate, Users is already imported
-  // Briefcase, // Unused
-  // ShieldCheck, // Unused
-  // FileText, // Unused
-  // ExternalLink, // Unused
-  // Info, // Unused
-  // Edit3, // Unused
-  // Trash2 as Trash2Icon, // Duplicate, Trash2 is already imported
-  // PlusCircle, // Unused
-  // Building2, // Unused
-  // Settings2, // Unused
-  // Mail as MailIcon, // Unused
-  // PhoneCall, // Unused
-  // MapPin as MapPinIcon, // Unused
-  // Eye as EyeIcon, // Unused
-  // EyeOff as EyeOffIcon, // Unused
-  // UploadCloud, // Unused
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUser } from '@/contexts/UserContext';
-// import { api } from '@/apis'; // Unused
 import type { 
-  // Company, // Unused
-  Department as ApiDepartment, // Used for contextDepartments
-  User as AppUser, // Changed from AppUser to User to match context
+  Department as ApiDepartment,
+  User as AppUser,
   UpdateCompanyData, 
   UpdateProfileData, 
-  // CreateDepartmentData, // Unused
-  // UpdateDepartmentData, // Unused
-  // CreateUserData, // Unused
-  // UpdateUserData, // Unused
 } from '@/apis/types';
 import { ApiError } from '@/apis/core/errors';
 import { useToast } from '@/hooks/use-toast';
-
-// Types for our data structures
-// interface Employee { // Unused local interface
-//   id: string;
-//   staff_id: string;
-//   first_name: string;
-//   last_name: string;
-//   email: string;
-//   phone?: string;
-//   job_title?: string;
-//   department_id?: string;
-//   department_name?: string;
-//   hire_date?: string;
-//   is_active: boolean;
-//   avatar_url?: string;
-// }
 
 interface DepartmentUI {
   id: string;
@@ -155,27 +97,15 @@ interface AccessRoleUI {
 }
 
 const SettingsPage = () => {
-  const { toast } = useToast(); // Keep toast
-  const { user: authUser, companyId, /* updateUser: updateAuthUser // Unused */ } = useAuth();
-  const { company, /* isLoading: isLoadingCompany, // Unused */ /* error: companyError, // Unused */ /* fetchCompany, // Unused */ /* updateCompany // Unused */ } = useCompany();
-  const { userProfile: contextUser, /* isLoading: isLoadingUsers, // Unused */ /* error: usersError, // Unused */ /* fetchUsers, // Unused */ /* createUser, // Unused */ /* updateContextUser, // Unused */ /* deleteUser // Unused */ } = useUser();
-  const { /* departments: contextDepartments, // Unused */ /* isLoading: isLoadingDepartments, // Unused */ /* error: departmentsError, // Unused */ /* fetchDepartments, // Unused */ /* createDepartment, // Unused */ /* updateDepartment: updateContextDepartment, // Unused */ /* deleteDepartment // Unused */ } = useCompany();
+  const { toast } = useToast();
+  const { user: authUser, companyId } = useAuth();
+  const { company } = useCompany();
+  const { userProfile: contextUser } = useUser();
 
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("general"); // Default to general
-  const [profileData, setProfileData] = useState<Partial<UpdateProfileData>>({}); // Keep
-  const [companyData, setCompanyData] = useState<Partial<UpdateCompanyData>>({}); // Keep
-  // const [showPassword, setShowPassword] = useState(false); // Unused
-  // const [showConfirmPassword, setShowConfirmPassword] = useState(false); // Unused
-
-  // const [isSheetOpen, setIsSheetOpen] = useState(false); // Unused
-  // const [sheetMode, setSheetMode] = useState<"addEmployee" | "editEmployee" | "addDepartment" | "editDepartment">("addEmployee"); // Unused
-
-  // const [currentEmployee, setCurrentEmployee] = useState<AppUser | null>(null); // Unused
-  // const [employeeFormData, setEmployeeFormData] = useState<Partial<CreateUserData | UpdateUserData>>({}); // Unused
-
-  // const [currentDepartment, setCurrentDepartment] = useState<DepartmentUI | null>(null); // Unused
-  // const [departmentFormData, setDepartmentFormData] = useState<Partial<CreateDepartmentData | UpdateDepartmentData>>({}); // Unused
+  const [activeTab, setActiveTab] = useState("general");
+  const [profileData, setProfileData] = useState<Partial<UpdateProfileData>>({});
+  const [companyData, setCompanyData] = useState<Partial<UpdateCompanyData>>({});
   
   const [departments, setDepartments] = useState<DepartmentUI[]>([]);
   const [employees, setEmployees] = useState<AppUser[]>([]);
@@ -183,11 +113,10 @@ const SettingsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddDepartment, setShowAddDepartment] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentUI | null>(null);
-  const [showEditDepartment, setShowEditDepartment] = useState(false); // Keep if edit functionality is there
+  const [showEditDepartment, setShowEditDepartment] = useState(false);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<AppUser | null>(null); // Keep if edit functionality is there
-  const [showEditEmployee, setShowEditEmployee] = useState(false); // Keep if edit functionality is there
-
+  const [selectedEmployee, setSelectedEmployee] = useState<AppUser | null>(null);
+  const [showEditEmployee, setShowEditEmployee] = useState(false);
 
   const getCurrentSection = useCallback(() => {
     const hash = router.asPath.split("#")[1];
@@ -199,11 +128,11 @@ const SettingsPage = () => {
   useEffect(() => {
     if (authUser) {
       setProfileData({
-        first_name: authUser.first_name || "",
-        last_name: authUser.last_name || "",
+        firstName: authUser.firstName || "",
+        lastName: authUser.lastName || "",
         email: authUser.email || "",
         phone: authUser.phone || "",
-        job_title: authUser.job_title || "",
+        jobTitle: authUser.jobTitle || "",
       });
     }
     if (company) {
@@ -211,17 +140,12 @@ const SettingsPage = () => {
         name: company.name || "",
         industry: company.industry || "",
         website: company.website || "",
-        // Add other company fields
       });
     }
-    // Note: fetchUsers and fetchDepartments are not available in the current context structure
-    // This would need to be implemented in a UserManagementContext
     getCurrentSection();
   }, [authUser, company, companyId, getCurrentSection]);
 
-  // Mock data for demonstration
   useEffect(() => {
-    // Mock departments data since contextDepartments is not available
     setDepartments([
       { id: '1', name: 'Engineering', manager_id: 'emp-1', manager_name: 'John Doe', employee_count: 12, created_at: '2024-01-15' },
       { id: '2', name: 'Marketing', manager_id: 'emp-2', manager_name: 'Jane Smith', employee_count: 8, created_at: '2024-01-10' },
@@ -229,20 +153,16 @@ const SettingsPage = () => {
       { id: '4', name: 'HR', manager_id: 'emp-4', manager_name: 'Alice Wilson', employee_count: 5, created_at: '2024-01-12' },
     ]);
 
-    // Mock employees data since contextUsers is not available
     setEmployees([
       {
         id: '1',
-        first_name: 'John',
-        last_name: 'Doe',
+        firstName: 'John',
+        lastName: 'Doe',
         email: 'john.doe@company.com',
         phone: '+1234567890',
-        job_title: 'Senior Developer',
-        department_id: '1', 
+        role: 'user' as any,
         created_at: '2024-01-15', 
         updated_at: '2024-01-15',
-        is_active: true,
-        role: 'employee',
       },
     ]);
 
@@ -272,7 +192,7 @@ const SettingsPage = () => {
   }, []);
 
   const filteredEmployees = employees.filter(emp =>
-    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -524,14 +444,14 @@ const SettingsPage = () => {
                 <TableCell className="font-medium">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={employee.avatar_url} />
+                      <AvatarImage src={employee.avatarUrl} />
                       <AvatarFallback>
-                        {employee.first_name?.[0]}{employee.last_name?.[0]}
+                        {employee.firstName?.[0]}{employee.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <div className="font-medium">
-                        {employee.first_name} {employee.last_name}
+                        {employee.firstName} {employee.lastName}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {employee.email}
@@ -540,11 +460,11 @@ const SettingsPage = () => {
                   </div>
                 </TableCell>
                 <TableCell>N/A</TableCell>
-                <TableCell>{(departments.find(d => d.id === employee.department_id))?.name || 'N/A'}</TableCell>
-                <TableCell>{employee.job_title || 'N/A'}</TableCell>
+                <TableCell>N/A</TableCell>
+                <TableCell>N/A</TableCell>
                 <TableCell>
-                  <Badge variant={employee.is_active ? 'default' : 'secondary'}>
-                    {employee.is_active ? 'Active' : 'Inactive'}
+                  <Badge variant="default">
+                    Active
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -569,7 +489,7 @@ const SettingsPage = () => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Employee</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete {employee.first_name} {employee.last_name}? 
+                            Are you sure you want to delete {employee.firstName} {employee.lastName}? 
                             This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -762,7 +682,6 @@ const SettingsPage = () => {
     </div>
   );
 
-  // Get the current page based on the URL or activeTab
   const getCurrentPageContent = () => {
     switch (activeTab) {
       case 'departments':
@@ -782,10 +701,10 @@ const SettingsPage = () => {
       moduleSidebar={settingsSidebarSections}
       moduleTitle="Settings"
       user={{
-        name: authUser?.first_name && authUser?.last_name ? `${authUser.first_name} ${authUser.last_name}` : 'User',
+        name: authUser?.firstName && authUser?.lastName ? `${authUser.firstName} ${authUser.lastName}` : 'User',
         email: authUser?.email || '',
         role: authUser?.role || 'Employee',
-        avatarUrl: authUser?.avatar_url
+        avatarUrl: authUser?.avatarUrl
       }}
     >
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">

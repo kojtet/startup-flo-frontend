@@ -104,12 +104,28 @@ export default function Team() {
   const loadProjectTeam = async (projectId: string) => {
     try {
       const [teamData, tasksData] = await Promise.all([
-        api.projects.getProjectTeam(projectId).catch(() => []),
+        api.projects.getProjectMembers(projectId).catch(() => []),
         api.projects.getProjectTasks(projectId).catch(() => [])
       ]);
       
-      setProjectUsers(teamData);
-      setTasks(tasksData);
+      // Convert ProjectMember[] to User[] for compatibility
+      const projectMembers = Array.isArray(teamData) ? teamData : [];
+      const usersFromMembers: UserType[] = projectMembers.map(member => ({
+        id: member.user_id,
+        email: member.email || '',
+        first_name: member.name?.split(' ')[0] || '',
+        last_name: member.name?.split(' ').slice(1).join(' ') || '',
+        role: member.role,
+        created_at: member.joined_at,
+        updated_at: member.joined_at,
+        avatar_url: member.avatar_url
+      }));
+      
+      setProjectUsers(usersFromMembers);
+      
+      // Handle PaginatedResponse for tasks
+      const tasksList = Array.isArray(tasksData) ? tasksData : tasksData?.data || [];
+      setTasks(tasksList);
     } catch (err) {
       console.error("Failed to load project team:", err);
     }
@@ -126,7 +142,7 @@ export default function Team() {
 
     setSubmitting(true);
     try {
-      await api.projects.assignUserToProject(assignForm.project_id, {
+      await api.projects.addProjectMember(assignForm.project_id, {
         user_id: assignForm.user_id,
         role: assignForm.role
       });
@@ -156,7 +172,7 @@ export default function Team() {
     if (!confirm("Are you sure you want to remove this user from the project?")) return;
 
     try {
-      await api.projects.removeUserFromProject(projectId, userId);
+      await api.projects.removeProjectMember(projectId, userId);
       await loadProjectTeam(projectId);
 
       toast({
@@ -193,16 +209,16 @@ export default function Team() {
   );
 
   const getUserTaskCount = (userId: string) => {
-    return tasks.filter(task => task.assigned_to === userId).length;
+    return tasks.filter(task => task.assignee_id === userId).length;
   };
 
   const getUserCompletedTasks = (userId: string) => {
-    return tasks.filter(task => task.assigned_to === userId && task.status === 'completed').length;
+    return tasks.filter(task => task.assignee_id === userId && task.status === 'done').length;
   };
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management" user={null}>
+      <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -210,8 +226,14 @@ export default function Team() {
     );
   }
 
+  // Create a user object with the required name property for ExtensibleLayout
+  const userWithName = user ? {
+    ...user,
+    name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+  } : null;
+
   return (
-    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management" user={user}>
+    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -362,7 +384,7 @@ export default function Team() {
               ) : (
                 <>
                   <div className="text-3xl font-bold text-blue-600">
-                    {tasks.filter(t => t.status === 'in_progress').length}
+                    {tasks.filter(t => t.status === 'in-progress').length}
                   </div>
                   <p className="text-sm text-gray-600">In progress</p>
                 </>
@@ -380,7 +402,7 @@ export default function Team() {
               ) : (
                 <>
                   <div className="text-3xl font-bold text-green-600">
-                    {tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100) : 0}%
+                    {tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100) : 0}%
                   </div>
                   <p className="text-sm text-gray-600">Tasks completed</p>
                 </>

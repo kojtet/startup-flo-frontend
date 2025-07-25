@@ -47,7 +47,11 @@ export function NotificationDemo() {
         // Simulate an async operation
         new Promise((resolve, reject) => {
           setTimeout(() => {
-            Math.random() > 0.5 ? resolve("Success!") : reject(new Error("Failed!"));
+            if (Math.random() > 0.5) {
+              resolve("Success!");
+            } else {
+              reject(new Error("Failed!"));
+            }
           }, 2000);
         }),
         {
@@ -56,9 +60,8 @@ export function NotificationDemo() {
           error: "Operation failed. Please try again.",
         }
       );
-    } catch (error) {
+    } catch {
       // Error is already handled by the promise wrapper
-      console.log("Promise rejected:", error);
     }
   };
 

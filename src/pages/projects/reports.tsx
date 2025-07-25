@@ -148,24 +148,24 @@ export default function ProjectReports() {
       p.endDate && new Date(p.endDate) < now && p.status !== 'completed'
     ).length;
 
-    // Tasks Overview
+    // Tasks Overview - using correct status values from ProjectTask type
     const totalTasks = tasksList.length;
-    const completedTasks = tasksList.filter(t => t.status === 'completed').length;
-    const inProgressTasks = tasksList.filter(t => t.status === 'in_progress').length;
+    const completedTasks = tasksList.filter(t => t.status === 'done').length;
+    const inProgressTasks = tasksList.filter(t => t.status === 'in-progress').length;
     const todoTasks = tasksList.filter(t => t.status === 'todo').length;
     const overdueTasks = tasksList.filter(t => 
-      t.due_date && new Date(t.due_date) < now && t.status !== 'completed'
+      t.due_date && new Date(t.due_date) < now && t.status !== 'done'
     ).length;
 
     // Performance Metrics
     const onTimeDelivery = completed > 0 ? Math.round((completed / total) * 100) : 0;
     const completedTasksInRange = tasksList.filter(t => 
-      t.status === 'completed' && t.completed_at && new Date(t.completed_at) >= timeRangeDate
+      t.status === 'done' && t.updated_at && new Date(t.updated_at) >= timeRangeDate
     );
     const averageTaskDuration = completedTasksInRange.length > 0 ? 
       Math.round(completedTasksInRange.reduce((sum, task) => {
-        if (task.created_at && task.completed_at) {
-          const duration = new Date(task.completed_at).getTime() - new Date(task.created_at).getTime();
+        if (task.created_at && task.updated_at) {
+          const duration = new Date(task.updated_at).getTime() - new Date(task.created_at).getTime();
           return sum + (duration / (1000 * 60 * 60 * 24)); // Convert to days
         }
         return sum;
@@ -247,7 +247,7 @@ export default function ProjectReports() {
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management" user={null}>
+      <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -256,7 +256,7 @@ export default function ProjectReports() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management" user={user}>
+    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

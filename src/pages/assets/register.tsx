@@ -279,7 +279,13 @@ export default function AssetRegisterPage() {
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={null}>
+      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
+        name: '',
+        email: '',
+        role: '',
+        avatarUrl: '',
+        companyId: ''
+      }}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -288,7 +294,13 @@ export default function AssetRegisterPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={user}>
+    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatar_url || '',
+      companyId: user.company_id || ''
+    }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

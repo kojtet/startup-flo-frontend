@@ -12,7 +12,7 @@ export default function CRMDashboard() {
   };
 
   return (
-    <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management" user={user}>
+    <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">CRM Dashboard</h1>

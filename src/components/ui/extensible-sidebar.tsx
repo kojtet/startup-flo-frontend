@@ -80,7 +80,8 @@ export function ExtensibleSidebar({
               )}
               <ul className={cn("space-y-1", isMainSidebar && "space-y-2")}>
                 {section.items.map((item, itemIndex) => {
-                  const isActive = router.pathname === item.href;
+                  const isActive = router.asPath === item.href || router.asPath.startsWith(item.href + '/');
+                  // console.log(`Route check: ${router.asPath} === ${item.href} = ${isActive}`);
                   const Icon = item.icon;
                   
                   return (

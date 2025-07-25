@@ -10,21 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import { Users2, Search, Plus, Mail, Phone, Loader2, Filter, X, Calendar, ChevronLeft, ChevronRight, Edit, Trash2, Eye } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useHR } from "@/contexts/HRContext";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/apis";
-import type { Employee, CreateEmployeeData, UpdateEmployeeData, Department } from "@/apis/types";
+import { useHR } from "@/hooks/useHR";
+import type { Employee, CreateEmployeeData, UpdateEmployeeData, Department } from "@/apis";
 
 export default function EmployeeDirectory() {
-  const { user, companyId } = useAuth();
+  const { user } = useAuth();
   const { 
     employees, 
     isLoadingEmployees, 
     employeesError, 
-    getEmployeesOptimized,
+    fetchEmployees,
     createEmployee,
     updateEmployee,
-    deleteEmployee
+    deleteEmployee,
+    fetchDepartments
   } = useHR();
   const { toast } = useToast();
 
@@ -50,6 +50,8 @@ export default function EmployeeDirectory() {
     first_name: "",
     last_name: "",
     email: "",
+    phone: "",
+    department_id: "",
     position: "",
     date_of_birth: "",
     date_hired: "",
@@ -76,46 +78,46 @@ export default function EmployeeDirectory() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const fetchData = async () => {
-    if (companyId) {
+    if (user?.company_id) {
       try {
-        console.log("🔄 Fetching employees for company:", companyId);
-        await getEmployeesOptimized(false);
-        console.log("✅ Employees fetched successfully");
+        await fetchEmployees();
       } catch (error) {
-        console.error("❌ Failed to fetch employees:", error);
+        console.error("❌ Employees Page: Failed to fetch employees:", error);
         toastRef({ title: "Error", description: "Could not load employees.", variant: "destructive" });
       }
     } else {
-      console.log("⚠️ No companyId available, skipping employee fetch");
+      console.log("⚠️ Employees Page: No company_id available, skipping employee fetch");
     }
   };
 
-  const fetchDepartments = async () => {
-    if (companyId) {
+  const fetchDepartmentsData = async () => {
+    if (user?.company_id) {
       setIsLoadingDepartments(true);
       try {
-        console.log("🔄 Fetching departments for company:", companyId);
-        const depts = await api.departments.getCompanyDepartments(companyId);
-        console.log("✅ Departments fetched successfully:", depts.length);
+        const depts = await fetchDepartments();
         setDepartments(depts);
       } catch (error) {
         console.error("❌ Failed to fetch departments:", error);
-        toastRef({ title: "Error", description: "Could not load departments.", variant: "destructive" });
+        // Don't show error toast for departments - it's not critical for the main functionality
+        // Just log the error and continue with empty departments list
+        setDepartments([]);
       } finally {
         setIsLoadingDepartments(false);
       }
     } else {
-      console.log("⚠️ No companyId available, skipping department fetch");
+      console.log("⚠️ No company_id available, skipping department fetch");
     }
   };
 
   useEffect(() => {
-    if (companyId) {
-      // Only fetch data once when companyId is available
+    if (user?.company_id) {
+      // Only fetch data once when company_id is available
       fetchData();
-      fetchDepartments();
+      fetchDepartmentsData();
+    } else {
+      console.log("⚠️ Employees Page: useEffect triggered but no company_id available");
     }
-  }, [companyId]); // Only depend on companyId
+  }, [user?.company_id]); // Only depend on company_id
   
   useEffect(() => {
     let updatedEmployees = employeesList;
@@ -163,7 +165,7 @@ export default function EmployeeDirectory() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!companyId) {
+    if (!user?.company_id) {
       toastRef({ title: "Error", description: "Company ID is missing.", variant: "destructive" });
       return;
     }
@@ -178,10 +180,12 @@ export default function EmployeeDirectory() {
         // Create employee
         const employeeData: CreateEmployeeData = {
           ...newEmployeeData,
-          staff_id: newEmployeeData.staff_id || `EMP${Date.now()}`,
+          staff_id: newEmployeeData.staff_id || "",
           first_name: newEmployeeData.first_name || "",
           last_name: newEmployeeData.last_name || "",
           email: newEmployeeData.email || "",
+          phone: newEmployeeData.phone || "",
+          department_id: newEmployeeData.department_id || "",
           position: newEmployeeData.position || "",
           date_of_birth: newEmployeeData.date_of_birth || "",
           date_hired: newEmployeeData.date_hired || new Date().toISOString().split('T')[0],
@@ -260,7 +264,7 @@ export default function EmployeeDirectory() {
   // Handle edit submit
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedEmployee || !companyId) {
+    if (!selectedEmployee || !user?.company_id) {
       toastRef({ title: "Error", description: "Employee or company ID is missing.", variant: "destructive" });
       return;
     }
@@ -293,26 +297,12 @@ export default function EmployeeDirectory() {
     }
   };
 
-  const userForLayout = user ? {
-    name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email,
-    email: user.email,
-    role: user.role || "User",
-    avatarUrl: user.avatar_url || undefined,
-  } : null;
+  // Note: ExtensibleLayout doesn't accept user prop, so we don't need userForLayout
 
-  // Debug logging
-  console.log("EmployeeDirectory Debug:", {
-    companyId,
-    isLoadingEmployees,
-    employeesError,
-    employeesCount: employeesList.length,
-    departmentsCount: departments.length,
-    isLoadingDepartments
-  });
 
   if (isLoadingEmployees) {
     return (
-      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading employees...</span>
@@ -324,7 +314,7 @@ export default function EmployeeDirectory() {
   // Show error state if there's an error
   if (employeesError) {
     return (
-      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-red-600 mb-4">Error loading employees: {employeesError}</p>
@@ -336,12 +326,11 @@ export default function EmployeeDirectory() {
                   try {
                     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/hr/setup-module-access`, {
                       headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                        'Authorization': `Bearer ${localStorage.getItem('sf_access_token')}`,
                         'Content-Type': 'application/json'
                       }
                     });
                     const result = await response.json();
-                    console.log("Setup result:", result);
                     toastRef({ title: "Success", description: "HR module access setup completed. Please refresh the page." });
                   } catch (error) {
                     console.error("Setup failed:", error);
@@ -429,7 +418,7 @@ export default function EmployeeDirectory() {
   };
 
   return (
-    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -514,8 +503,8 @@ export default function EmployeeDirectory() {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.length === 0 ? (
-                          <SelectItem value="none" disabled>No departments available</SelectItem>
+                        {!Array.isArray(departments) || departments.length === 0 ? (
+                          <SelectItem value="none" disabled>Loading departments...</SelectItem>
                         ) : (
                           departments.map((dept) => (
                             <SelectItem key={dept.id} value={dept.id}>
@@ -552,7 +541,8 @@ export default function EmployeeDirectory() {
                       id="staff_id"
                       value={newEmployeeData.staff_id || ""}
                       onChange={(e) => setNewEmployeeData(prev => ({ ...prev, staff_id: e.target.value }))}
-                      placeholder="Auto-generated if empty"
+                      required
+                      placeholder="Enter staff ID"
                     />
                   </div>
                 </div>
@@ -643,8 +633,8 @@ export default function EmployeeDirectory() {
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
-                      {departments.length === 0 ? (
-                        <SelectItem value="none" disabled>No departments available</SelectItem>
+                      {!Array.isArray(departments) || departments.length === 0 ? (
+                        <SelectItem value="none" disabled>Loading departments...</SelectItem>
                       ) : (
                         departments.map((dept) => (
                           <SelectItem key={dept.id} value={dept.id}>
@@ -681,7 +671,8 @@ export default function EmployeeDirectory() {
                     id="edit_staff_id"
                     value={newEmployeeData.staff_id || ""}
                     onChange={(e) => setNewEmployeeData(prev => ({ ...prev, staff_id: e.target.value }))}
-                    placeholder="Auto-generated if empty"
+                    required
+                    placeholder="Enter staff ID"
                   />
                 </div>
               </div>
@@ -735,9 +726,7 @@ export default function EmployeeDirectory() {
                   <div>
                     <Label className="text-sm font-medium text-gray-500">Department</Label>
                     <p className="text-sm">
-                      {typeof selectedEmployee.departments === 'string' 
-                        ? selectedEmployee.departments 
-                        : (selectedEmployee.departments as any)?.name || 'N/A'}
+                      {selectedEmployee.departments?.name || 'N/A'}
                     </p>
                   </div>
                   <div>
@@ -864,7 +853,7 @@ export default function EmployeeDirectory() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All departments</SelectItem>
-                        {departments.map((dept) => (
+                        {Array.isArray(departments) && departments.map((dept) => (
                           <SelectItem key={dept.id} value={dept.id}>
                             {dept.name}
                           </SelectItem>
@@ -999,9 +988,7 @@ export default function EmployeeDirectory() {
               {paginatedEmployees.map((employee) => {
                 const statusBadge = getStatusBadge(employee.status === "active");
                 // Handle department field - it could be string or object
-                const departmentName: string = typeof employee.departments === 'string' 
-                  ? employee.departments 
-                  : (employee.departments as any)?.name || 'N/A';
+                const departmentName: string = employee.departments?.name || 'N/A';
                 return (
                   <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-3 flex-1">

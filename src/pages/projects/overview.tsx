@@ -244,7 +244,7 @@ export default function ProjectsOverview() {
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management" user={null}>
+      <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -262,7 +262,7 @@ export default function ProjectsOverview() {
   };
 
   return (
-    <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management" user={transformedUser}>
+    <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

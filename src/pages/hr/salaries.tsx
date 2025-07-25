@@ -21,7 +21,7 @@ export default function SalaryStructures() {
   ];
 
   return (
-    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={user}>
+    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

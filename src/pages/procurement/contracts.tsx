@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/apis';
+import { api } from '@/apis';
 import type { Vendor } from '@/apis/types';
 import {
   FileClock,
@@ -59,6 +59,32 @@ interface Contract {
 export default function ContractsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Helper function to get user's display name
+  const getUserDisplayName = (user: any) => {
+    if (!user) return '';
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+    if (user.first_name) return user.first_name;
+    if (user.last_name) return user.last_name;
+    return user.email || '';
+  };
+
+  // Create user object in the format expected by ExtensibleLayout
+  const layoutUser = user ? {
+    name: getUserDisplayName(user),
+    email: user.email,
+    role: user.role,
+    avatarUrl: user.avatar_url,
+    companyId: user.company_id
+  } : {
+    name: '',
+    email: '',
+    role: '',
+    avatarUrl: '',
+    companyId: ''
+  };
   
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -364,7 +390,7 @@ export default function ContractsPage() {
       <ExtensibleLayout
         moduleSidebar={procurementSidebarSections}
         moduleTitle="Procurement"
-        user={user}
+        user={layoutUser}
       >
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
@@ -377,7 +403,7 @@ export default function ContractsPage() {
     <ExtensibleLayout
       moduleSidebar={procurementSidebarSections}
       moduleTitle="Procurement"
-      user={user}
+      user={layoutUser}
     >
       <div className="space-y-6">
         {/* Header */}

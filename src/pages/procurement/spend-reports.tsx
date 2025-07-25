@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/apis';
+import { api } from '@/apis';
 import type { Vendor } from '@/apis/types';
 import {
   BarChart3,
@@ -59,6 +59,21 @@ interface SpendSummary {
 export default function SpendReportsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Create user object for ExtensibleLayout
+  const layoutUser = user ? {
+    name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+    email: user.email,
+    role: user.role,
+    avatarUrl: user.avatar_url,
+    companyId: user.company_id
+  } : {
+    name: '',
+    email: '',
+    role: '',
+    avatarUrl: undefined,
+    companyId: undefined
+  };
   
   const [spendData, setSpendData] = useState<SpendData[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -308,7 +323,7 @@ export default function SpendReportsPage() {
       <ExtensibleLayout
         moduleSidebar={procurementSidebarSections}
         moduleTitle="Procurement"
-        user={user}
+        user={layoutUser}
       >
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
@@ -321,7 +336,7 @@ export default function SpendReportsPage() {
     <ExtensibleLayout
       moduleSidebar={procurementSidebarSections}
       moduleTitle="Procurement"
-      user={user}
+      user={layoutUser}
     >
       <div className="space-y-6">
         {/* Header */}

@@ -37,16 +37,12 @@ import {
   Save,
   Shield,
   Lock,
-  Key,
   Eye,
   EyeOff,
   Smartphone,
   Clock,
   UserX,
   AlertTriangle,
-  CheckCircle,
-  Settings,
-  History,
   Globe,
   Monitor,
 } from 'lucide-react';
@@ -157,7 +153,7 @@ const SecurityPage = () => {
         title: 'Success',
         description: 'Security settings saved successfully',
       });
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to save security settings',
@@ -192,7 +188,7 @@ const SecurityPage = () => {
         new_password: '',
         confirm_password: '',
       });
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to change password',
@@ -214,7 +210,7 @@ const SecurityPage = () => {
         title: 'Success',
         description: 'Session revoked successfully',
       });
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to revoke session',
@@ -236,7 +232,7 @@ const SecurityPage = () => {
         title: 'Success',
         description: 'All other sessions revoked successfully',
       });
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to revoke sessions',
@@ -569,7 +565,7 @@ const SecurityPage = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Revoke All Sessions</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will sign you out from all devices except this one. You'll need to sign in again on other devices.
+                        This will sign you out from all devices except this one. You&apos;ll need to sign in again on other devices.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -23,18 +23,53 @@ import {
   Users2
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/apis";
-import type { Employee, Onboarding, OnboardingTask } from "@/apis/types";
+import type { Employee, OnboardingTask } from "@/apis";
 import { useToast } from "@/hooks/use-toast";
 
+// Interface matching the actual API response
+interface OnboardingResponse {
+  id: string;
+  completed: boolean;
+  start_date: string;
+  end_date: string | null;
+  checklist: string[];
+  notes: string | null;
+  created_at: string;
+  employee_id: string;
+  status: "in_progress" | "completed" | "paused";
+  employee: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    position: string;
+    staff_id: string;
+  };
+}
+
 // Helper type for UI - with completion tracking
-interface OnboardingWithTaskList extends Omit<Onboarding, "checklist"> {
+interface OnboardingWithTaskList {
+  id: string;
+  completed: boolean;
+  start_date: string;
+  end_date: string | null;
   checklist: OnboardingTask[];
-  employee?: Employee;
+  notes: string | null;
+  created_at: string;
+  employee_id: string;
+  status: "in_progress" | "completed" | "paused";
+  employee: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    position: string;
+    staff_id: string;
+  };
 }
 
 export default function OnboardingView() {
-  const { user } = useAuth();
+  const { user, apiClient, isHydrated, isAuthenticated } = useAuth() as any; // Get the authenticated apiClient
   const { toast } = useToast();
   const router = useRouter();
   const { id } = router.query;
@@ -44,91 +79,65 @@ export default function OnboardingView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTasks, setEditingTasks] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch onboarding data
   useEffect(() => {
-    if (id) {
+    // Only fetch when auth is hydrated and user is authenticated
+    if (id && isHydrated && isAuthenticated && user?.company_id) {
       fetchOnboarding();
+    } else if (isHydrated && !isAuthenticated) {
+      // User is not authenticated, show error
+      setError('Authentication required. Please log in to access this page.');
+      setLoading(false);
+    } else if (isHydrated && isAuthenticated && !user?.company_id) {
+      // User is authenticated but missing company_id
+      setError('User profile incomplete. Please contact support.');
+      setLoading(false);
     }
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isHydrated, isAuthenticated, user?.company_id]);
 
   const fetchOnboarding = async () => {
     try {
       setLoading(true);
       setNotFound(false);
+      setError(null);
       
-      // Try to get onboarding data from localStorage first
-      const storedOnboarding = localStorage.getItem('currentOnboarding');
-      if (storedOnboarding) {
-        const onboardingData = JSON.parse(storedOnboarding);
-        
-        // Normalize checklist data to ensure consistent structure
-        if (onboardingData.checklist) {
-          onboardingData.checklist = onboardingData.checklist.map((item: any) => {
-            if (typeof item === 'string') {
-              return { task: item, completed: false };
-            } else if (item && typeof item === 'object') {
-              return {
-                task: item.task || item.description || 'Unnamed Task',
-                completed: Boolean(item.completed)
-              };
-            } else {
-              return { task: 'Invalid Task', completed: false };
-            }
-          });
-        }
-        
-        setOnboarding(onboardingData);
-        // Clear the stored data after using it
-        localStorage.removeItem('currentOnboarding');
-        return;
-      }
+      console.log('Fetching onboarding with ID:', id);
+      console.log('User:', user);
+      console.log('User company_id:', user?.company_id);
       
-      // Fallback: Try to find the onboarding from the list
-      const [onboardingsData, employeesData] = await Promise.all([
-        api.hr.getOnboardings(),
-        api.hr.getEmployees()
-      ]);
+      // Fetch onboarding by ID - employee data is included in response
+      const response = await apiClient.get(`/hr/onboarding/${id}`);
+      console.log('Onboarding response:', response.data);
       
-      // Find the specific onboarding
-      const targetOnboarding = onboardingsData.find(o => o.id === id);
-      if (!targetOnboarding) {
-        setNotFound(true);
-        return;
-      }
+      const onboardingData: OnboardingResponse = response.data;
       
-      // Find the employee data
-      const employee = employeesData.find(emp => emp.staff_id === targetOnboarding.employee_id);
+      // Convert checklist from string array to OnboardingTask array
+      const normalizedChecklist: OnboardingTask[] = onboardingData.checklist.map(task => ({
+        task,
+        completed: false // Since the API doesn't return completion status, we assume all are incomplete
+      }));
       
-      // Normalize checklist data
-      const normalizedOnboarding = {
-        ...targetOnboarding,
-        employee,
-        checklist: targetOnboarding.checklist?.map((item: any) => {
-          if (typeof item === 'string') {
-            return { task: item, completed: false };
-          } else if (item && typeof item === 'object') {
-            return {
-              task: item.task || item.description || 'Unnamed Task',
-              completed: Boolean(item.completed)
-            };
-          } else {
-            return { task: 'Invalid Task', completed: false };
-          }
-        }) || []
-      };
+      setOnboarding({
+        ...onboardingData,
+        checklist: normalizedChecklist
+      });
+    } catch (err: any) {
+      console.error('Error fetching onboarding:', err);
+      console.error('Error response:', err.response);
+      console.error('Error status:', err.response?.status);
+      console.error('Error data:', err.response?.data);
       
-      setOnboarding(normalizedOnboarding);
-    } catch (error) {
-      console.error('Error fetching onboarding:', error);
-      
-      // Don't show "not found" for API errors, show error toast instead
-      if (error instanceof Error && error.message === 'Onboarding not found') {
+      if (err?.response?.status === 404) {
         setNotFound(true);
       } else {
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to load onboarding details. Please try again.';
+        setError(errorMessage);
         toast({
-          title: "Error",
-          description: "Failed to load onboarding details. Please try again."
+          title: 'Error',
+          description: errorMessage
         });
       }
     } finally {
@@ -139,23 +148,15 @@ export default function OnboardingView() {
   // Mark onboarding as completed
   const markAsCompleted = async () => {
     if (!onboarding) return;
-    
     try {
       setIsSubmitting(true);
-      await api.hr.completeOnboarding(onboarding.id);
-
-      setOnboarding(prev => prev ? {
-        ...prev,
-        status: 'completed',
-        completed: true
-      } : null);
-
+      await apiClient.put(`/hr/onboarding/${onboarding.id}`, { status: 'completed' });
+      setOnboarding(prev => prev ? { ...prev, status: 'completed' } : null);
       toast({
         title: "Onboarding completed!",
         description: "The onboarding process has been marked as completed."
       });
     } catch (error) {
-      console.error('Error marking as completed:', error);
       toast({
         title: "Error",
         description: 'Failed to mark onboarding as completed. Please try again.'
@@ -168,35 +169,13 @@ export default function OnboardingView() {
   // Update task completion
   const updateTaskCompletion = async (taskIndex: number, completed: boolean) => {
     if (!onboarding) return;
-
     try {
-      const updatedChecklist = onboarding.checklist.map((item, index) => {
-        if (index === taskIndex) {
-          // Ensure we maintain proper task object structure
-          if (typeof item === 'string') {
-            return { task: item, completed };
-          } else if (item && typeof item === 'object') {
-            return { 
-              task: item.task || item.description || 'Unnamed Task', 
-              completed 
-            };
-          } else {
-            return { task: 'Invalid Task', completed };
-          }
-        }
-        return item;
-      });
-      
-      await api.hr.updateOnboardingChecklist(onboarding.id, {
-        checklist: updatedChecklist
-      });
-      
-      setOnboarding(prev => prev ? {
-        ...prev,
-        checklist: updatedChecklist
-      } : null);
+      const updatedChecklist = onboarding.checklist.map((item, index) =>
+        index === taskIndex ? { ...item, completed } : item
+      );
+      await apiClient.put(`/hr/onboarding/${onboarding.id}`, { checklist: updatedChecklist });
+      setOnboarding(prev => prev ? { ...prev, checklist: updatedChecklist } : null);
     } catch (error) {
-      console.error('Error updating task completion:', error);
       toast({
         title: "Error",
         description: 'Failed to update task. Please try again.'
@@ -207,34 +186,11 @@ export default function OnboardingView() {
   // Add new task
   const addTask = async (task: string) => {
     if (!onboarding || !task.trim()) return;
-
     try {
-      // Ensure all existing tasks maintain proper structure when adding new task
-      const normalizedExistingTasks = onboarding.checklist.map((item: any) => {
-        if (typeof item === 'string') {
-          return { task: item, completed: false };
-        } else if (item && typeof item === 'object') {
-          return {
-            task: item.task || item.description || 'Unnamed Task',
-            completed: Boolean(item.completed)
-          };
-        } else {
-          return { task: 'Invalid Task', completed: false };
-        }
-      });
-
-      const updatedChecklist = [...normalizedExistingTasks, { task: task.trim(), completed: false }];
-      
-      await api.hr.updateOnboardingChecklist(onboarding.id, {
-        checklist: updatedChecklist
-      });
-      
-      setOnboarding(prev => prev ? {
-        ...prev,
-        checklist: updatedChecklist
-      } : null);
+      const updatedChecklist = [...onboarding.checklist, { task: task.trim(), completed: false }];
+      await apiClient.put(`/hr/onboarding/${onboarding.id}`, { checklist: updatedChecklist });
+      setOnboarding(prev => prev ? { ...prev, checklist: updatedChecklist } : null);
     } catch (error) {
-      console.error('Error adding task:', error);
       toast({
         title: "Error",
         description: 'Failed to add task. Please try again.'
@@ -276,16 +232,9 @@ export default function OnboardingView() {
     }
   };
 
-  const userForLayout = {
-    name: user ? (`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email) : 'Guest',
-    email: user?.email || 'guest@example.com',
-    role: user?.role || 'User',
-    avatarUrl: user?.avatar_url || undefined
-  };
-
   if (loading) {
     return (
-      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -293,9 +242,35 @@ export default function OnboardingView() {
     );
   }
 
+  // Show authentication error
+  if (error && (error.includes('Authentication required') || error.includes('User profile incomplete'))) {
+    return (
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
+        <div className="text-center py-12">
+          <div className="mx-auto w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <User className="h-12 w-12 text-red-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h1>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            {error}
+          </p>
+          <div className="flex justify-center space-x-4">
+            <Button onClick={() => router.push('/auth/login')} variant="default">
+              Log In
+            </Button>
+            <Button onClick={() => router.push('/hr/onboarding')} variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Onboarding List
+            </Button>
+          </div>
+        </div>
+      </ExtensibleLayout>
+    );
+  }
+
   if (notFound || !onboarding) {
     return (
-      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
             <Users2 className="h-12 w-12 text-gray-400" />
@@ -323,7 +298,7 @@ export default function OnboardingView() {
   const progress = calculateProgress(onboarding.checklist);
 
   return (
-    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -337,7 +312,7 @@ export default function OnboardingView() {
               Back to Onboarding List
             </Button>
             <h1 className="text-3xl font-bold text-gray-900">
-              {onboarding.employee?.first_name} {onboarding.employee?.last_name} - Onboarding
+              {onboarding.employee.first_name} {onboarding.employee.last_name} - Onboarding
             </h1>
             <p className="text-gray-600 mt-2">
               Started {new Date(onboarding.start_date).toLocaleDateString()}
@@ -374,34 +349,24 @@ export default function OnboardingView() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Name</p>
                   <p className="text-lg font-semibold">
-                    {onboarding.employee?.first_name} {onboarding.employee?.last_name}
+                    {onboarding.employee.first_name} {onboarding.employee.last_name}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Staff ID</p>
-                  <p>{onboarding.employee?.staff_id}</p>
+                  <p>{onboarding.employee.staff_id}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Position</p>
-                  <p>{onboarding.employee?.position}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Department</p>
-                  <p>{onboarding.employee?.departments?.name || 'No Department'}</p>
+                  <p>{onboarding.employee.position}</p>
                 </div>
                 <div className="flex items-center">
                   <Mail className="mr-2 h-4 w-4 text-gray-400" />
-                  <p>{onboarding.employee?.email}</p>
+                  <p>{onboarding.employee.email}</p>
                 </div>
-                {onboarding.employee?.phone && (
-                  <div className="flex items-center">
-                    <Phone className="mr-2 h-4 w-4 text-gray-400" />
-                    <p>{onboarding.employee.phone}</p>
-                  </div>
-                )}
                 <div className="flex items-center">
                   <Calendar className="mr-2 h-4 w-4 text-gray-400" />
-                  <p>Hired: {new Date(onboarding.employee?.date_hired || '').toLocaleDateString()}</p>
+                  <p>Started: {new Date(onboarding.start_date).toLocaleDateString()}</p>
                 </div>
               </CardContent>
             </Card>
@@ -460,38 +425,23 @@ export default function OnboardingView() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {onboarding.checklist.map((task, index) => {
-                    // Normalize task data to ensure it's an object with task and completed properties
-                    let taskData;
-                    if (typeof task === 'string') {
-                      taskData = { task: task, completed: false };
-                    } else if (task && typeof task === 'object') {
-                      taskData = {
-                        task: task.task || task.description || 'Unnamed Task',
-                        completed: Boolean(task.completed)
-                      };
-                    } else {
-                      taskData = { task: 'Invalid Task', completed: false };
-                    }
-                    
-                    return (
-                      <div 
-                        key={index} 
-                        className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50"
-                      >
-                        <Checkbox
-                          checked={taskData.completed}
-                          onCheckedChange={(checked) => updateTaskCompletion(index, Boolean(checked))}
-                        />
-                        <span className={`text-sm flex-1 ${taskData.completed ? 'line-through text-gray-500' : ''}`}>
-                          {taskData.task}
-                        </span>
-                        {taskData.completed && (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        )}
-                      </div>
-                    );
-                  })}
+                  {onboarding.checklist.map((task, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <Checkbox
+                        checked={task.completed}
+                        onCheckedChange={(checked) => updateTaskCompletion(index, Boolean(checked))}
+                      />
+                      <span className={`text-sm flex-1 ${task.completed ? 'line-through text-gray-500' : ''}`}>
+                        {task.task}
+                      </span>
+                      {task.completed && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                  ))}
                   
                   {onboarding.checklist.length === 0 && (
                     <div className="text-center py-8 text-gray-500">

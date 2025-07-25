@@ -1,5 +1,5 @@
 import { toast } from "@/hooks/use-toast";
-import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from "lucide-react";
+import { CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
@@ -39,8 +39,6 @@ class NotificationService {
   }
 
   private show(type: NotificationType, message: string, options: NotificationOptions = {}) {
-    const Icon = this.getIcon(type);
-    
     return toast({
       title: options.title,
       description: message,
@@ -135,7 +133,7 @@ class NotificationService {
     }: {
       loading?: string;
       success?: string | ((data: T) => string);
-      error?: string | ((error: any) => string);
+      error?: string | ((error: unknown) => string);
     } = {}
   ): Promise<T> {
     // Show loading notification

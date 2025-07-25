@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/apis';
+import { api } from '@/apis';
 import {
   ShoppingCart,
   Users,
@@ -43,6 +43,12 @@ export default function ProcurementDashboard() {
   
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Create user object with required name property
+  const userWithName = user ? {
+    ...user,
+    name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+  } : null;
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -89,7 +95,7 @@ export default function ProcurementDashboard() {
       <ExtensibleLayout
         moduleSidebar={procurementSidebarSections}
         moduleTitle="Procurement"
-        user={user}
+        user={userWithName}
       >
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
@@ -102,7 +108,7 @@ export default function ProcurementDashboard() {
     <ExtensibleLayout
       moduleSidebar={procurementSidebarSections}
       moduleTitle="Procurement"
-      user={user}
+      user={userWithName}
     >
       <div className="space-y-6">
         {/* Header */}

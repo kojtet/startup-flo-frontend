@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/apis';
+import { api } from '@/apis';
 import type { Vendor } from '@/apis/types';
 import {
   FileQuestion,
@@ -92,6 +92,21 @@ export default function RFQsPage() {
     priority: 'medium' as RFQ['priority'],
     selected_vendors: [] as string[]
   });
+
+  // Create user object for ExtensibleLayout
+  const layoutUser = user ? {
+    name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+    email: user.email,
+    role: user.role,
+    avatarUrl: user.avatar_url,
+    companyId: user.company_id
+  } : {
+    name: '',
+    email: '',
+    role: '',
+    avatarUrl: '',
+    companyId: ''
+  };
 
   // Mock data for demonstration
   useEffect(() => {
@@ -317,7 +332,7 @@ export default function RFQsPage() {
       <ExtensibleLayout
         moduleSidebar={procurementSidebarSections}
         moduleTitle="Procurement"
-        user={user}
+        user={layoutUser}
       >
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
@@ -330,7 +345,7 @@ export default function RFQsPage() {
     <ExtensibleLayout
       moduleSidebar={procurementSidebarSections}
       moduleTitle="Procurement"
-      user={user}
+      user={layoutUser}
     >
       <div className="space-y-6">
         <div className="flex justify-between items-center">

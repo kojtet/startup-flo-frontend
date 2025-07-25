@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/apis';
 import type { Transfer, CreateTransferData, UpdateTransferData, FinancialAccount } from '@/apis/types';
 import { Plus, Edit, Trash2, ArrowLeftRight, ArrowRight, Search, Filter, CheckCircle, Clock, XCircle } from 'lucide-react';
@@ -29,6 +30,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 export default function TransfersPage() {
+  const { user: authUser } = useAuth();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,15 @@ export default function TransfersPage() {
     reference: ''
   });
   const { toast } = useToast();
+
+  // Create user object for ExtensibleLayout
+  const user = {
+    name: `${authUser?.first_name || ''} ${authUser?.last_name || ''}`.trim() || authUser?.email || 'User',
+    email: authUser?.email || '',
+    role: authUser?.role || 'user',
+    avatarUrl: authUser?.avatar_url,
+    companyId: authUser?.company_id
+  };
 
   useEffect(() => {
     fetchData();
@@ -258,7 +269,7 @@ export default function TransfersPage() {
   const pendingTransfers = transfers.filter(t => t.status === 'pending').length;
 
   return (
-    <ExtensibleLayout moduleSidebar={financeSidebarSections} moduleTitle="Finance & Accounting" user={user}>
+    <ExtensibleLayout moduleSidebar={financeSidebarSections} moduleTitle="Finance & Accounting" >
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Money Transfers</h1>

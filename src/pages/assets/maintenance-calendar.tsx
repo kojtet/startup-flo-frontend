@@ -50,7 +50,7 @@ export default function MaintenanceCalendarPage() {
       // Fetch maintenance records for each asset
       if (assetsResponse) {
         const maintenancePromises = assetsResponse.map(asset => 
-          api.assets.getAssetMaintenanceHistory(asset.id).catch(() => [])
+          api.assets.getAssetMaintenance(asset.id).catch(() => [])
         );
         
         const maintenanceResults = await Promise.all(maintenancePromises);
@@ -71,9 +71,9 @@ export default function MaintenanceCalendarPage() {
   const getMaintenanceStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'scheduled': return 'bg-yellow-100 text-yellow-800';
       case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -81,9 +81,9 @@ export default function MaintenanceCalendarPage() {
   const getMaintenanceIcon = (status: string) => {
     switch (status) {
       case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'scheduled': return <Clock className="h-4 w-4" />;
       case 'in_progress': return <Wrench className="h-4 w-4" />;
-      case 'overdue': return <AlertCircle className="h-4 w-4" />;
+      case 'cancelled': return <AlertCircle className="h-4 w-4" />;
       default: return <Calendar className="h-4 w-4" />;
     }
   };
@@ -95,7 +95,7 @@ export default function MaintenanceCalendarPage() {
     return maintenanceRecords.filter(record => {
       if (!record.scheduled_date) return false;
       const scheduledDate = new Date(record.scheduled_date);
-      return scheduledDate >= today && scheduledDate <= nextWeek && record.status === 'pending';
+      return scheduledDate >= today && scheduledDate <= nextWeek && record.status === 'scheduled';
     });
   };
 
@@ -104,14 +104,14 @@ export default function MaintenanceCalendarPage() {
     return maintenanceRecords.filter(record => {
       if (!record.scheduled_date) return false;
       const scheduledDate = new Date(record.scheduled_date);
-      return scheduledDate < today && record.status === 'pending';
+      return scheduledDate < today && record.status === 'scheduled';
     });
   };
 
   const filteredMaintenance = maintenanceRecords.filter(record => {
     const asset = assets.find(a => a.id === record.asset_id);
     const matchesSearch = asset?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.maintenance_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          record.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
@@ -130,7 +130,12 @@ export default function MaintenanceCalendarPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={user}>
+    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatar_url
+    }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -273,7 +278,7 @@ export default function MaintenanceCalendarPage() {
                               <div className="flex items-center space-x-2">
                                 {getMaintenanceIcon(record.status)}
                                 <h3 className="text-lg font-semibold">
-                                  {record.maintenance_type || 'Maintenance'}
+                                  {record.title || 'Maintenance'}
                                 </h3>
                               </div>
                               <Badge className={`${getMaintenanceStatusColor(record.status)} border-0`}>
@@ -302,8 +307,8 @@ export default function MaintenanceCalendarPage() {
                                 </span>
                               </div>
                               <div>
-                                <span className="text-gray-500">Technician:</span>
-                                <span className="ml-2">{record.technician || 'Unassigned'}</span>
+                                <span className="text-gray-500">Performed By:</span>
+                                <span className="ml-2">{record.performed_by || 'Unassigned'}</span>
                               </div>
                             </div>
                             
@@ -332,7 +337,7 @@ export default function MaintenanceCalendarPage() {
                         <div className="flex-1">
                           <h3 className="font-semibold">{asset?.name}</h3>
                           <p className="text-sm text-gray-600">
-                            {record.maintenance_type} - Due {new Date(record.scheduled_date!).toLocaleDateString()}
+                            {record.title} - Due {new Date(record.scheduled_date!).toLocaleDateString()}
                           </p>
                         </div>
                         <Badge variant="outline" className="text-yellow-700 border-yellow-300">
@@ -358,7 +363,7 @@ export default function MaintenanceCalendarPage() {
                         <div className="flex-1">
                           <h3 className="font-semibold">{asset?.name}</h3>
                           <p className="text-sm text-gray-600">
-                            {record.maintenance_type} - Overdue since {new Date(record.scheduled_date!).toLocaleDateString()}
+                            {record.title} - Overdue since {new Date(record.scheduled_date!).toLocaleDateString()}
                           </p>
                         </div>
                         <Badge variant="outline" className="text-red-700 border-red-300">

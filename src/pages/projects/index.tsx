@@ -12,7 +12,7 @@ export default function ProjectsDashboard() {
   };
 
   return (
-    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management" user={user}>
+    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Projects Dashboard</h1>

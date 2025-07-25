@@ -19,6 +19,19 @@ export default function AssetAssignmentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Transform user to match ExtensibleLayout's expected format
+  const layoutUser = user ? {
+    name: user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email,
+    email: user.email,
+    role: user.role || 'User',
+    avatarUrl: user.avatar_url
+  } : {
+    name: '',
+    email: '',
+    role: '',
+    avatarUrl: undefined
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -56,7 +69,7 @@ export default function AssetAssignmentsPage() {
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={null}>
+      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={layoutUser}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -65,7 +78,7 @@ export default function AssetAssignmentsPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={user}>
+    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={layoutUser}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

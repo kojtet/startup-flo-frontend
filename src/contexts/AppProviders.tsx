@@ -1,45 +1,25 @@
 import React, { ReactNode } from 'react';
+import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from './AuthContext';
-import { UserProvider } from './UserContext';
-import { CompanyProvider } from './CompanyContext';
 import { SubscriptionProvider } from './SubscriptionContext';
-import { ProjectsProvider } from './ProjectsContext';
-import { CRMProvider } from './CRMContext';
-import { HRProvider } from './HRContext';
-import { FinanceProvider } from './FinanceContext';
-import { VendorProvider } from './VendorContext';
-import { AssetsProvider } from './AssetsContext';
-import { Toaster } from '@/components/ui/toaster';
 
 interface AppProvidersProps {
   children: ReactNode;
 }
 
-export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
+export function AppProviders({ children }: AppProvidersProps) {
   return (
-    <AuthProvider>
-      <UserProvider>
-        <CompanyProvider>
-          <SubscriptionProvider>
-            <ProjectsProvider>
-              <CRMProvider>
-                <HRProvider>
-                  <FinanceProvider>
-                    <VendorProvider>
-                      <AssetsProvider>
-                        {children}
-                        <Toaster />
-                      </AssetsProvider>
-                    </VendorProvider>
-                  </FinanceProvider>
-                </HRProvider>
-              </CRMProvider>
-            </ProjectsProvider>
-          </SubscriptionProvider>
-        </CompanyProvider>
-      </UserProvider>
-    </AuthProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthProvider>
+        <SubscriptionProvider>
+          {children}
+        </SubscriptionProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
-};
-
-export default AppProviders;
+} 

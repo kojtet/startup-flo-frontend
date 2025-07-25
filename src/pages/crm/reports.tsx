@@ -135,7 +135,7 @@ export default function SalesReports() {
 
   if (loading) {
     return (
-      <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management" user={user}>
+      <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management" >
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           <span className="ml-2 text-gray-600">Loading reports...</span>
@@ -145,7 +145,7 @@ export default function SalesReports() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management" user={user}>
+    <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management" >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>

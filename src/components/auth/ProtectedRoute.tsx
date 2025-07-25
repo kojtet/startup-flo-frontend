@@ -1,48 +1,41 @@
-import { useEffect, ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
-  children: ReactNode;
-  fallback?: ReactNode;
+  children: React.ReactNode;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  fallback = (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 flex flex-col items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-      <p className="text-gray-600 text-lg">Loading...</p>
-    </div>
-  )
-}) => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated, loading, isHydrated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    console.log('ProtectedRoute - Auth state:', { isLoading, isAuthenticated, hasUser: !!user });
-    
-    if (!isLoading && !isAuthenticated) {
-      console.log('Redirecting to login...');
-      // Redirect to login with return URL
-      const returnUrl = router.asPath;
-      router.push(`/auth/login?redirect=${encodeURIComponent(returnUrl)}`);
+    if (isHydrated && !loading && !isAuthenticated) {
+      // Store the current path to redirect back after login
+      const currentPath = router.asPath;
+      if (currentPath !== '/auth/login' && currentPath !== '/auth/signup') {
+        router.push(`/auth/login?redirect=${encodeURIComponent(currentPath)}`);
+      }
     }
-  }, [isAuthenticated, isLoading, router, user]);
+  }, [isAuthenticated, loading, isHydrated, router]);
 
-  // Show loading spinner while checking authentication
-  if (isLoading) {
-    console.log('ProtectedRoute - Showing loading (isLoading = true)');
-    return <>{fallback}</>;
+  // Show loading state while checking authentication or during hydration
+  if (loading || !isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Show loading spinner while redirecting
+  // Don't render children if not authenticated
   if (!isAuthenticated) {
-    console.log('ProtectedRoute - Showing loading (not authenticated)');
-    return <>{fallback}</>;
+    return null;
   }
 
-  // User is authenticated, render children
-  console.log('ProtectedRoute - Rendering children (authenticated)');
   return <>{children}</>;
-}; 
+} 

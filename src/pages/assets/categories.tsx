@@ -45,9 +45,9 @@ export default function AssetCategoriesPage() {
   const [formData, setFormData] = useState<CreateAssetCategoryData>({
     name: '',
     description: '',
-    parent_category_id: undefined,
     depreciation_rate: 0,
-    useful_life_years: 5
+    depreciation_method: 'straight_line',
+    useful_life_months: 60
   });
 
   useEffect(() => {
@@ -102,8 +102,7 @@ export default function AssetCategoriesPage() {
       const updateData: UpdateAssetCategoryData = {
         name: formData.name,
         description: formData.description,
-        depreciation_rate: formData.depreciation_rate,
-        useful_life_years: formData.useful_life_years
+        depreciation_rate: formData.depreciation_rate
       };
 
       const updatedCategory = await api.assets.updateAssetCategory(selectedCategory.id, updateData);
@@ -151,9 +150,9 @@ export default function AssetCategoriesPage() {
     setFormData({
       name: category.name,
       description: category.description || '',
-      parent_category_id: category.parent_category_id,
-      depreciation_rate: category.depreciation_rate || 0,
-      useful_life_years: category.useful_life_years || 5
+      depreciation_rate: 0, // Default value since it's not in AssetCategory
+      depreciation_method: category.depreciation_method || 'straight_line',
+      useful_life_months: category.useful_life_months || 60
     });
     setIsEditDialogOpen(true);
   };
@@ -162,9 +161,9 @@ export default function AssetCategoriesPage() {
     setFormData({
       name: '',
       description: '',
-      parent_category_id: undefined,
       depreciation_rate: 0,
-      useful_life_years: 5
+      depreciation_method: 'straight_line',
+      useful_life_months: 60
     });
   };
 
@@ -176,7 +175,13 @@ export default function AssetCategoriesPage() {
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={null}>
+      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
+        name: '',
+        email: '',
+        role: '',
+        avatarUrl: '',
+        companyId: ''
+      }}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -185,7 +190,13 @@ export default function AssetCategoriesPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={user}>
+    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatar_url || '',
+      companyId: user.company_id || ''
+    }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -243,12 +254,12 @@ export default function AssetCategoriesPage() {
                     </div>
                     
                     <div>
-                      <Label htmlFor="useful_life_years">Useful Life (Years)</Label>
+                      <Label htmlFor="useful_life_months">Useful Life (Months)</Label>
                       <Input
-                        id="useful_life_years"
+                        id="useful_life_months"
                         type="number"
-                        value={formData.useful_life_years}
-                        onChange={(e) => setFormData(prev => ({ ...prev, useful_life_years: parseInt(e.target.value) || 5 }))}
+                        value={formData.useful_life_months}
+                        onChange={(e) => setFormData(prev => ({ ...prev, useful_life_months: parseInt(e.target.value) || 60 }))}
                       />
                     </div>
                   </div>
@@ -283,27 +294,25 @@ export default function AssetCategoriesPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Parent Categories</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Categories</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {categories.filter(cat => !cat.parent_category_id).length}
-              </div>
-              <p className="text-xs text-muted-foreground">Top-level categories</p>
+              <div className="text-2xl font-bold">{categories.length}</div>
+              <p className="text-xs text-muted-foreground">Categories in use</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Subcategories</CardTitle>
+              <CardTitle className="text-sm font-medium">Categories with Assets</CardTitle>
               <Archive className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {categories.filter(cat => cat.parent_category_id).length}
+                {categories.filter(cat => cat.description).length}
               </div>
-              <p className="text-xs text-muted-foreground">Subcategories created</p>
+              <p className="text-xs text-muted-foreground">Categories with descriptions</p>
             </CardContent>
           </Card>
         </div>
@@ -363,28 +372,28 @@ export default function AssetCategoriesPage() {
                   
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Assets Count:</span>
-                      <Badge variant="secondary">{category.asset_count || 0}</Badge>
+                      <span className="text-gray-500">Depreciation Method:</span>
+                      <Badge variant="secondary">{category.depreciation_method || 'Not set'}</Badge>
                     </div>
                     
-                    {category.depreciation_rate && (
+                    {category.useful_life_months && (
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Depreciation Rate:</span>
-                        <span>{category.depreciation_rate}%</span>
+                        <span className="text-gray-500">Useful Life:</span>
+                        <span>{Math.round(category.useful_life_months / 12)} years</span>
+                      </div>
+                    )}
+                    
+                    {category.salvage_percentage && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Salvage Value:</span>
+                        <span>{category.salvage_percentage}%</span>
                       </div>
                     )}
                     
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Useful Life:</span>
-                      <span>{category.useful_life_years} years</span>
+                      <span className="text-gray-500">Created:</span>
+                      <span>{new Date(category.created_at).toLocaleDateString()}</span>
                     </div>
-                    
-                    {category.parent_category && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Parent:</span>
-                        <Badge variant="outline">{category.parent_category.name}</Badge>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -436,12 +445,12 @@ export default function AssetCategoriesPage() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="edit_useful_life_years">Useful Life (Years)</Label>
+                    <Label htmlFor="edit_useful_life_months">Useful Life (Months)</Label>
                     <Input
-                      id="edit_useful_life_years"
+                      id="edit_useful_life_months"
                       type="number"
-                      value={formData.useful_life_years}
-                      onChange={(e) => setFormData(prev => ({ ...prev, useful_life_years: parseInt(e.target.value) || 5 }))}
+                      value={formData.useful_life_months}
+                      onChange={(e) => setFormData(prev => ({ ...prev, useful_life_months: parseInt(e.target.value) || 60 }))}
                     />
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import { api } from '@/apis';
 import type { Asset } from '@/apis/types';
 import { TrendingDown, Download, Search, DollarSign, Loader2, BarChart3 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { transformUserForLayout } from '@/lib/utils';
 
 export default function DepreciationReportPage() {
   const { user } = useAuth();
@@ -102,7 +103,11 @@ export default function DepreciationReportPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={user}>
+    <ExtensibleLayout 
+      moduleSidebar={assetsSidebarSections} 
+      moduleTitle="Asset Management" 
+      user={transformUserForLayout(user)}
+    >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

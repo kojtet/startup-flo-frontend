@@ -1,306 +1,337 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { apiClient, API_ENDPOINTS, STORAGE_KEYS } from "@/apis";
-import { api } from "@/apis";
-import type { User, LoginCredentials, RegisterCredentials /* ForgotPasswordCredentials, ResetPasswordCredentials, UpdateProfileData */ } from "@/apis/types"; // Removed unused types
-// Removed: import type { AxiosError } from "axios";
-import { ApiError } from "@/apis/core/errors";
-
-interface AuthContextType {
-  user: User | null;
+import React, {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    useCallback,
+    useRef,
+    ReactNode,
+  } from "react";
+  import axios, { AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
+  import { jwtDecode } from "jwt-decode";
+  
+  /***************************************
+   * CONFIGURATION                       *
+   **************************************/
+  const API_BASE_URL = "https://startup-flo-backend.onrender.com";
+  
+  const STORAGE_KEYS = {
+    accessToken: "sf_access_token",
+    refreshToken: "sf_refresh_token",
+    user: "sf_user",
+  };
+  
+  /***************************************
+   * TYPE DEFINITIONS                    *
+   **************************************/
+  export interface User {
+    id: string;
+    email: string;
+    company_id: string;
+    role: string;
+    is_verified?: boolean;
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string;
+  }
+  
+  interface Tokens {
+    accessToken: string;
+    refreshToken: string;
+    /** ISO strings from server – optional fall‑back to JWT exp */
+    accessTokenExpires?: string;
+    refreshTokenExpires?: string;
+    tokenType: "Bearer";
+  }
+  
+  type Nullable<T> = T | null;
+  
+  interface AuthContextType {
+  user: Nullable<User>;
   loading: boolean;
-  // isLoading: boolean; // Duplicate of loading
-  error: Error | null;
   isAuthenticated: boolean;
-  token: string | null;
-  companyId: string | null;
-  login: (credentials: LoginCredentials) => Promise<User>;
-  register: (credentials: RegisterCredentials) => Promise<User>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  isHydrated: boolean;
+  login: (credentials: { email: string; password: string }) => Promise<void>;
+  register: (credentials: { email: string; password: string; companyName: string }) => Promise<void>;
+  logout: () => void;
+  /** Manually trigger a token refresh */
+  refreshTokens: () => Promise<void>;
+  error: { message: string } | null;
 }
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-interface AuthState { // Added AuthState interface based on usage
-  user: User | null;
-  loading: boolean;
-  error: Error | null;
-  isAuthenticated: boolean;
-  token: string | null;
-}
-
-const initialAuthState: AuthState = {
-  user: null,
-  loading: true,
-  error: null,
-  isAuthenticated: false,
-  token: null,
-};
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [authState, setAuthState] = useState<AuthState>(initialAuthState);
-  const [isInitializing, setIsInitializing] = useState<boolean>(true);
-  // const [user, setUser] = useState<User | null>(null); // Managed by authState
-  // const [companyId, setCompanyId] = useState<string | null>(null); // Managed by authState
-  // const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false); // Managed by authState
-  // const [isLoading, setIsLoading] = useState<boolean>(true); // Managed by authState
-  // const [error, setError] = useState<Error | null>(null); // Managed by authState
-  // const [authInitialized, setAuthInitialized] = useState<boolean>(false); // Unused
-
-  const initializeAuth = useCallback(async () => {
-    console.log("🔐 Initializing auth...");
-    setAuthState(prev => ({ ...prev, loading: true }));
-    
-    // First, check if we have a stored token
-    const storedToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    console.log("🔑 Stored token found:", !!storedToken);
-    
-    if (!storedToken) {
-      // No token found, user is not authenticated
-      console.log("❌ No token found, setting as unauthenticated");
-      setAuthState(prev => ({
-        ...prev,
-        user: null,
-        isAuthenticated: false,
-        loading: false,
-        error: null,
-        token: null,
-      }));
-      apiClient.setAuthToken(null);
-      setIsInitializing(false);
-      return;
-    }
-
-    // Set the token before making API calls
-    console.log("🔄 Setting token in API client");
-    apiClient.setAuthToken(storedToken);
-    
+  
+  /***************************************
+   * INTERNAL UTILS                      *
+   **************************************/
+  interface JWTPayload {
+    /** expiry (seconds since epoch) */
+    exp: number;
+    iat: number;
+  }
+  
+  const readStorage = <T,>(key: string): Nullable<T> => {
+    if (typeof window === "undefined") return null;
     try {
-      // Now try to get user data with the token
-      console.log("📡 Making getMe API call...");
-      const userData = await api.auth.getMe();
-      console.log("✅ User data retrieved:", { id: userData.id, email: userData.email, company_id: userData.company_id });
-      setAuthState(prev => ({
-        ...prev,
-        user: userData,
-        isAuthenticated: true,
-        loading: false,
-        error: null,
-        token: storedToken,
-      }));
-    } catch (err) {
-      console.error("❌ Failed to get user data, token may be invalid:", err);
-      console.error("❌ Error details:", {
-        message: err instanceof Error ? err.message : 'Unknown error',
-        name: err instanceof Error ? err.name : 'Unknown',
-        stack: err instanceof Error ? err.stack : 'No stack'
-      });
-      
-      // Check if it's an authentication error (401, 403, or session expired)
-      const isAuthError = err instanceof Error && (
-        err.message.toLowerCase().includes('session expired') ||
-        err.message.toLowerCase().includes('unauthorized') ||
-        err.message.toLowerCase().includes('authentication failed')
-      );
-      
-      console.log("🔍 Is auth error:", isAuthError);
-      
-      // Only set error if it's not an auth error (which is expected for expired tokens)
-      const errorToSet = isAuthError ? null : (err instanceof Error ? err : new Error("Authentication failed"));
-      
-      // Token is invalid, clear it silently
-      setAuthState(prev => ({
-        ...prev,
-        user: null,
-        isAuthenticated: false,
-        loading: false,
-        error: errorToSet,
-        token: null,
-      }));
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-      apiClient.resetAuthState();
-    } finally {
-      setIsInitializing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
-
-  const refreshUser = useCallback(async () => {
-    if (!authState.isAuthenticated) return;
-    setAuthState(prev => ({ ...prev, loading: true }));
-    try {
-      const userData = await api.auth.getMe();
-      setAuthState(prev => ({ ...prev, user: userData, loading: false, error: null }));
-    } catch (err) {
-      console.error("Failed to refresh user data, potentially logged out:", err);
-      
-      // Check if it's an authentication error (expected for expired tokens)
-      const isAuthError = err instanceof Error && (
-        err.message.toLowerCase().includes('session expired') ||
-        err.message.toLowerCase().includes('unauthorized') ||
-        err.message.toLowerCase().includes('authentication failed')
-      );
-      
-      // Only set error if it's not an auth error (which is expected for expired tokens)
-      const errorToSet = isAuthError ? null : (err instanceof Error ? err : new Error("Refresh failed"));
-      
-      setAuthState(prev => ({
-        ...prev,
-        user: null,
-        isAuthenticated: false,
-        loading: false,
-        error: errorToSet,
-      }));
-      
-      // Clear tokens on auth errors
-      if (isAuthError) {
-        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-        apiClient.resetAuthState();
-      }
-    }
-  }, [authState.isAuthenticated]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (authState.isAuthenticated) {
-        refreshUser();
-      }
-    }, 15 * 60 * 1000); 
-    return () => clearInterval(intervalId);
-  }, [authState.isAuthenticated, refreshUser]);
-
-  const login = useCallback(async (credentials: LoginCredentials): Promise<User> => {
-    console.log("🔐 Starting login process...");
-    // Clear any existing tokens and errors before attempting login
-    setAuthState(prev => ({ ...prev, loading: true, error: null }));
-    setIsInitializing(false); // Prevent conflicts with initialization
-    
-    // Clear any existing tokens to prevent "Session expired" errors during login
-    console.log("🧹 Clearing existing tokens...");
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    apiClient.resetAuthState();
-    
-    try {
-      console.log("📡 Making login API call...");
-      const authData = await api.auth.login(credentials); // Assuming login returns AuthResponse
-      console.log("✅ Login successful:", { user: authData.user.id, email: authData.user.email });
-      setAuthState({
-        user: authData.user,
-        token: authData.tokens.accessToken,
-        isAuthenticated: true,
-        loading: false,
-        error: null,
-      });
-      apiClient.setAuthToken(authData.tokens.accessToken);
-      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.tokens.accessToken);
-      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, authData.tokens.refreshToken);
-      return authData.user;
-    } catch (err) {
-      console.error("❌ Login failed:", err);
-      const apiError = err as ApiError;
-      setAuthState(prev => ({
-        ...prev,
-        loading: false,
-        error: apiError.message ? new Error(apiError.message) : new Error("Login failed"),
-        isAuthenticated: false,
-        user: null,
-        token: null,
-      }));
-      throw apiError;
-    }
-  }, []);
-
-  const register = useCallback(async (credentials: RegisterCredentials): Promise<User> => {
-    // Clear any existing tokens and errors before attempting registration
-    setAuthState(prev => ({ ...prev, loading: true, error: null }));
-    setIsInitializing(false); // Prevent conflicts with initialization
-    
-    // Clear any existing tokens to prevent "Session expired" errors during registration
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    apiClient.resetAuthState();
-    
-    try {
-      const authData = await api.auth.signup(credentials); // Using signup method
-      setAuthState({
-        user: authData.user,
-        token: authData.tokens.accessToken,
-        isAuthenticated: true,
-        loading: false,
-        error: null,
-      });
-      apiClient.setAuthToken(authData.tokens.accessToken);
-      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.tokens.accessToken);
-      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, authData.tokens.refreshToken);
-      return authData.user;
-    } catch (err) {
-      const apiError = err as ApiError;
-       setAuthState(prev => ({
-        ...prev,
-        loading: false,
-        error: apiError.message ? new Error(apiError.message) : new Error("Registration failed"),
-        isAuthenticated: false,
-        user: null,
-        token: null,
-      }));
-      throw apiError;
-    }
-  }, []);
-
-  const logout = async () => {
-    try {
-      if (authState.token) {
-        await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
-      }
-    } catch (error) {
-      console.error("Logout API call failed:", error);
-    } finally {
-      setAuthState({ 
-        user: null, 
-        loading: false, 
-        error: null, 
-        isAuthenticated: false, 
-        token: null 
-      });
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-      apiClient.setAuthToken(null);
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch (e) {
+      return null;
     }
   };
+  
+  const writeStorage = (key: string, value: unknown) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(key, JSON.stringify(value));
+  };
+  
+  const removeStorage = (key: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(key);
+  };
+  
+  /***************************************
+   * AXIOS INSTANCE & INTERCEPTORS       *
+   **************************************/
+  const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+  });
+  
+  /**
+   * Attach Authorization header if accessToken exists.
+   */
+  apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+    const token = readStorage<string>(STORAGE_KEYS.accessToken);
+    if (token && config.headers) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+    return config;
+  });
+  
+  /***************************************
+   * AUTH PROVIDER IMPLEMENTATION        *
+   **************************************/
+  const AuthContext = createContext<AuthContextType | undefined>(undefined);
+  
+  export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<Nullable<User>>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<{ message: string } | null>(null);
+  const [refreshTimerId, setRefreshTimerId] = useState<number | undefined>(undefined);
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
+  
+  // Use refs to avoid circular dependencies
+  const refreshTokensRef = useRef<() => Promise<void>>();
+  const logoutRef = useRef<() => void>();
+  
+    const logout = useCallback(() => {
+      removeStorage(STORAGE_KEYS.accessToken);
+      removeStorage(STORAGE_KEYS.refreshToken);
+      removeStorage(STORAGE_KEYS.user);
+      setUser(null);
+      if (refreshTimerId) window.clearTimeout(refreshTimerId);
+      delete apiClient.defaults.headers.common["Authorization"];
+    }, [refreshTimerId]);
+  
+    const scheduleTokenRefresh = useCallback((accessToken: string, accessTokenExpires?: string) => {
+      if (refreshTimerId) {
+        window.clearTimeout(refreshTimerId);
+      }
+  
+      let expiresAtMs: number;
+  
+      if (accessTokenExpires) {
+        expiresAtMs = new Date(accessTokenExpires).getTime();
+      } else {
+        const { exp } = jwtDecode<JWTPayload>(accessToken);
+        expiresAtMs = exp * 1000;
+      }
+  
+      // Don't schedule refresh if token is already expired or expires very soon
+      const timeUntilExpiry = expiresAtMs - Date.now();
+      if (timeUntilExpiry <= 0) {
+        console.warn('Token is already expired, not scheduling refresh');
+        return;
+      }
+  
+      // Refresh 60 seconds before expiry, but at least 5 seconds from now
+      const timeout = Math.max(timeUntilExpiry - 60_000, 5_000);
+      const id = window.setTimeout(() => {
+        // Only attempt refresh if we still have a user (not logged out)
+        if (user && refreshTokensRef.current) {
+          refreshTokensRef.current().catch(() => {
+            // If refresh failed, log out silently
+            if (logoutRef.current) {
+              logoutRef.current();
+            }
+          });
+        }
+      }, timeout);
+  
+      setRefreshTimerId(id);
+    }, [refreshTimerId, user]);
+  
+    const refreshTokens = useCallback(async () => {
+      const refreshToken = readStorage<string>(STORAGE_KEYS.refreshToken);
+      if (!refreshToken) throw new Error("No refresh token available");
+  
+      const res: AxiosResponse<{ tokens: Tokens; user: User }> = await apiClient.post("/auth/refresh", {
+        refreshToken,
+      });
+      
+      // Directly persist the session without circular dependency
+      writeStorage(STORAGE_KEYS.accessToken, res.data.tokens.accessToken);
+      writeStorage(STORAGE_KEYS.refreshToken, res.data.tokens.refreshToken);
+      writeStorage(STORAGE_KEYS.user, res.data.user);
+  
+      apiClient.defaults.headers.common["Authorization"] = `Bearer ${res.data.tokens.accessToken}`;
+      setUser(res.data.user);
+      scheduleTokenRefresh(res.data.tokens.accessToken, res.data.tokens.accessTokenExpires);
+    }, [scheduleTokenRefresh]);
+  
+    // Update refs when functions change
+    useEffect(() => {
+      logoutRef.current = logout;
+    }, [logout]);
+  
+    useEffect(() => {
+      refreshTokensRef.current = refreshTokens;
+    }, [refreshTokens]);
+  
+    /** Persist tokens + user to localStorage and set axios header */
+    const persistSession = useCallback((tokens: Tokens, usr: User) => {
+      writeStorage(STORAGE_KEYS.accessToken, tokens.accessToken);
+      writeStorage(STORAGE_KEYS.refreshToken, tokens.refreshToken);
+      writeStorage(STORAGE_KEYS.user, usr);
+  
+      apiClient.defaults.headers.common["Authorization"] = `Bearer ${tokens.accessToken}`;
+      setUser(usr);
+      scheduleTokenRefresh(tokens.accessToken, tokens.accessTokenExpires);
+    }, [scheduleTokenRefresh]);
+  
+    /***********************************
+     * PUBLIC ACTIONS                   *
+     ***********************************/
+    const login = async (credentials: { email: string; password: string }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res: AxiosResponse<{ tokens: Tokens; user: User }> = await apiClient.post("/auth/login", {
+          email: credentials.email,
+          password: credentials.password,
+        });
+        persistSession(res.data.tokens, res.data.user);
+      } catch (err) {
+        if (err instanceof Error) {
+          setError({ message: err.message });
+        } else {
+          setError({ message: "Login failed" });
+        }
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const value: AuthContextType = {
-    user: authState.user,
-    loading: authState.loading,
-    // isLoading: authState.loading, // Removed duplicate
-    error: authState.error,
-    isAuthenticated: authState.isAuthenticated,
-    token: authState.token,
-    companyId: authState.user?.company_id || null,
+    const register = async (credentials: { email: string; password: string; companyName: string }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res: AxiosResponse<{ tokens: Tokens; user: User }> = await apiClient.post("/auth/register", {
+          email: credentials.email,
+          password: credentials.password,
+          companyName: credentials.companyName,
+        });
+        persistSession(res.data.tokens, res.data.user);
+      } catch (err) {
+        if (err instanceof Error) {
+          setError({ message: err.message });
+        } else {
+          setError({ message: "Registration failed" });
+        }
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+
+  
+    /***********************************
+     * STARTUP: HYDRATE & SETUP         *
+     ***********************************/
+    useEffect(() => {
+      // Hydrate user data from localStorage
+      const storedUser = readStorage<User>(STORAGE_KEYS.user);
+      const accessToken = readStorage<string>(STORAGE_KEYS.accessToken);
+      
+      if (storedUser && accessToken) {
+        setUser(storedUser);
+        // Attach header for SSR / first render
+        apiClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+        // Schedule refresh based on existing token
+        scheduleTokenRefresh(accessToken);
+      }
+      
+      // Mark as hydrated after first render
+      setIsHydrated(true);
+    }, []);
+  
+    /***********************************
+     * GLOBAL RESPONSE INTERCEPTOR      *
+     ***********************************/
+    useEffect(() => {
+      const interceptorId = apiClient.interceptors.response.use(
+        (response) => response,
+        async (error: AxiosError) => {
+          if (error.response?.status === 401) {
+            // Attempt token refresh once
+            try {
+              if (refreshTokensRef.current) {
+                await refreshTokensRef.current();
+                // Retry original request with new token
+                if (error.config) {
+                  return apiClient(error.config as AxiosRequestConfig);
+                }
+              }
+            } catch (refreshError) {
+              if (logoutRef.current) {
+                logoutRef.current();
+              }
+            }
+          }
+          return Promise.reject(error);
+        }
+      );
+      return () => {
+        apiClient.interceptors.response.eject(interceptorId);
+      };
+    }, []);
+  
+      const value: AuthContextType = {
+    user,
+    loading,
+    isAuthenticated: Boolean(user),
+    isHydrated,
     login,
     register,
     logout,
-    refreshUser,
+    refreshTokens,
+    error,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  // Export the configured API client for use in other hooks
+  (value as any).apiClient = apiClient;
+  
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  };
+  
+  /***************************************
+   * CONSUMER HOOK                       *
+   **************************************/
+  export function useAuth() {
+    const ctx = useContext(AuthContext);
+    if (ctx === undefined) {
+      throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return ctx;
   }
-  return context;
-};
-
-export default AuthContext;
+  

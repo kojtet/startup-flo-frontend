@@ -156,7 +156,7 @@ export default function Deliverables() {
   const inProgressCount = deliverables.filter(d => d.status === "In Progress").length;
 
   return (
-    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management" user={user}>
+    <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

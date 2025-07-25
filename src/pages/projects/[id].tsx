@@ -33,12 +33,22 @@ import {
   ChevronDown,
   ChevronRight
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiClient } from "@/apis";
 import { notifications } from "@/components/NotificationService";
 import type { Project, User as AppUser, ProjectSprint } from "@/apis/types";
+
+// Helper function to get access token from localStorage
+const getAccessToken = (): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("sf_access_token");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
 
 interface ProjectTask {
   id: string;
@@ -85,7 +95,7 @@ interface SprintWithTasks extends ProjectSprint {
 export default function ProjectDetail() {
   const router = useRouter();
   const { id } = router.query;
-  const { user, companyId } = useAuth();
+  const { user } = useAuth();
   
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
@@ -146,10 +156,9 @@ export default function ProjectDetail() {
 
   // Create a user object compatible with ExtensibleLayout
   const layoutUser = user ? {
-    name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
+    name: (user as any).first_name && (user as any).last_name ? `${(user as any).first_name} ${(user as any).last_name}` : (user.email || 'User'),
     email: user.email,
     role: user.role || 'User',
-    avatarUrl: user.avatar_url || undefined
   } : null;
 
   // Date utility functions
@@ -175,60 +184,28 @@ export default function ProjectDetail() {
   };
 
   useEffect(() => {
-    if (!id || !companyId) return;
-    
-    const fetchProjectData = async () => {
+    const projectId = Array.isArray(id) ? id[0] : id;
+    if (!projectId) return;
+
+    const fetchProject = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch project details, tasks, milestones, sprints and users in parallel
-        const [projectRes, tasksRes, milestonesRes, sprintsRes, usersRes] = await Promise.all([
-          apiClient.get(`/projects/${id}`),
-          apiClient.get(`/project-tasks/project/${id}`),
-          apiClient.get(`/project-deliverables/project/${id}`),
-          apiClient.get(`/project-sprints/project/${id}`),
-          apiClient.get(`/users/company/${companyId}`)
-        ]);
-
-        setProject(projectRes.data as Project);
-        const allTasks = Array.isArray(tasksRes.data) ? tasksRes.data : [];
-        setTasks(allTasks);
-        setMilestones(Array.isArray(milestonesRes.data) ? milestonesRes.data : []);
-        const allSprints = Array.isArray(sprintsRes.data) ? sprintsRes.data : [];
-        setSprints(allSprints);
-        setUsers(Array.isArray((usersRes.data as any)?.data) ? (usersRes.data as any).data : []);
-
-        // Process sprints with their tasks
-        const sprintsWithTasksData = await Promise.all(
-          allSprints.map(async (sprint) => {
-            const sprintTasks = allTasks.filter((task: ProjectTask) => task.sprint_id === sprint.id);
-            const completedTasks = sprintTasks.filter(task => task.status === 'done' || task.status === 'completed').length;
-            const progress = sprintTasks.length > 0 ? Math.round((completedTasks / sprintTasks.length) * 100) : 0;
-            
-            return {
-              ...sprint,
-              tasks: sprintTasks,
-              taskCount: sprintTasks.length,
-              completedTasks,
-              progress
-            };
-          })
-        );
-        
-        setSprintsWithTasks(sprintsWithTasksData);
-
+        // Use fetch instead of apiClient
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/projects/${projectId}`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const data = await res.json();
+        setProject(data);
       } catch (err) {
-        console.error('Error fetching project data:', err);
+        console.error('Error fetching project:', err);
         setError('Failed to load project details. Please try again.');
-        notifications.error('Failed to load project details');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProjectData();
-  }, [id, companyId]);
+    fetchProject();
+  }, [id]);
 
   // Memoized data calculations
   const projectStats = useMemo(() => {
@@ -259,8 +236,9 @@ export default function ProjectDetail() {
   }, [tasks, milestones, sprints, sprintsWithTasks]);
 
   const getUserName = (userId: string) => {
+    console.log('Getting user name for ID:', userId);
     const user = users.find(u => u.id === userId);
-    return user ? `${user.first_name} ${user.last_name}` : 'Unknown User';
+    return user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : 'Unknown User';
   };
 
   const handleCreateSprint = async () => {
@@ -278,8 +256,21 @@ export default function ProjectDetail() {
         owner_id: user.id
       };
       
-      const response = await apiClient.post('/project-sprints', sprintData);
-      const newSprint = response.data;
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/project-sprints`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAccessToken()}`
+        },
+        body: JSON.stringify(sprintData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create sprint. Please try again.');
+      }
+
+      const newSprint = await response.json();
       
       // Add to sprints list
       setSprints(prev => [...prev, newSprint]);
@@ -340,8 +331,8 @@ export default function ProjectDetail() {
     today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
     
     // Get project start and end dates
-    const projectStartDate = project.start_date || project.startDate;
-    const projectEndDate = (project as any).expected_end || project.end_date || project.endDate;
+    const projectStartDate = project.start_date;
+    const projectEndDate = project.expected_end;
     
     if (isNaN(expectedDate.getTime())) {
       notifications.error('Please enter a valid expected date.');
@@ -383,8 +374,21 @@ export default function ProjectDetail() {
       console.log('JSON payload:', JSON.stringify(milestoneData, null, 2));
       console.log('API endpoint:', '/project-deliverables');
       
-      const response = await apiClient.post('/project-deliverables', milestoneData);
-      const newMilestone = response.data;
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/project-deliverables`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAccessToken()}`
+        },
+        body: JSON.stringify(milestoneData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create milestone. Please try again.');
+      }
+
+      const newMilestone = await response.json();
       
       // Add to milestones list
       setMilestones(prev => [...prev, newMilestone]);
@@ -470,8 +474,21 @@ export default function ProjectDetail() {
       
       console.log('Creating task with data:', taskData);
       
-      const response = await apiClient.post('/project-tasks', taskData);
-      const newTask = response.data;
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/project-tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAccessToken()}`
+        },
+        body: JSON.stringify(taskData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create task. Please try again.');
+      }
+
+      const newTask = await response.json();
       
       // Add to tasks list
       setTasks(prev => [...prev, newTask]);
@@ -554,8 +571,21 @@ export default function ProjectDetail() {
 
   const handleMoveTaskToSprint = async (taskId: string, sprintId: string) => {
     try {
-      const response = await apiClient.put(`/project-tasks/${taskId}`, { sprint_id: sprintId });
-      const updatedTask = response.data;
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/project-tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAccessToken()}`
+        },
+        body: JSON.stringify({ sprint_id: sprintId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to move task to sprint. Please try again.');
+      }
+
+      const updatedTask = await response.json();
       
       // Update tasks list
       setTasks(prev => 
@@ -608,7 +638,18 @@ export default function ProjectDetail() {
     try {
       setIsDeleting(true);
       
-      await apiClient.delete(`/project-tasks/${taskToDelete.id}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/project-tasks/${taskToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAccessToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete task. Please try again.');
+      }
+
       notifications.success(`Task "${taskToDelete.title}" deleted successfully!`);
       
       // Remove task from local state
@@ -687,7 +728,7 @@ export default function ProjectDetail() {
 
   if (loading) {
     return (
-      <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management" user={layoutUser}>
+      <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -700,7 +741,7 @@ export default function ProjectDetail() {
 
   if (error || !project) {
     return (
-      <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management" user={layoutUser}>
+      <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -715,7 +756,7 @@ export default function ProjectDetail() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management" user={layoutUser}>
+    <ExtensibleLayout moduleSidebar={getProjectsSidebarSections()} moduleTitle="Project Management">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center space-x-4">
@@ -744,14 +785,14 @@ export default function ProjectDetail() {
                 <Calendar className="h-5 w-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-500">Start Date</p>
-                  <p className="font-medium">{formatDate(project.start_date || project.startDate)}</p>
+                  <p className="font-medium">{formatDate(project.start_date)}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
                 <Target className="h-5 w-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-500">Due Date</p>
-                  <p className="font-medium">{formatDate((project as any).expected_end || project.end_date || project.endDate)}</p>
+                  <p className="font-medium">{formatDate(project.expected_end)}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
@@ -759,9 +800,7 @@ export default function ProjectDetail() {
                 <div>
                   <p className="text-sm text-gray-500">Team Lead</p>
                   <p className="font-medium">{
-                    ((project as any).team_lead || project.owner_id) ? 
-                    getUserName((project as any).team_lead || project.owner_id) : 
-                    'Not assigned'
+                    project.team_lead ? getUserName(project.team_lead) : 'Not assigned'
                   }</p>
                 </div>
               </div>
@@ -841,7 +880,7 @@ export default function ProjectDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{project.team_ids?.length || 0}</div>
+              <div className="text-2xl font-bold">0</div>
               <p className="text-sm text-gray-600">Members</p>
             </CardContent>
           </Card>
@@ -856,7 +895,7 @@ export default function ProjectDetail() {
             <CardContent>
               <div className="text-2xl font-bold">
                 {(() => {
-                  const dueDate = (project as any).expected_end || project.end_date || project.endDate;
+                  const dueDate = project.expected_end;
                   return isValidDate(dueDate) ? Math.max(0, Math.ceil((new Date(dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : '∞';
                 })()}
               </div>
@@ -1479,7 +1518,7 @@ export default function ProjectDetail() {
                     className="mt-1"
                     min={(() => {
                       const today = new Date().toISOString().split('T')[0];
-                      const projectStart = project?.start_date || project?.startDate;
+                      const projectStart = project?.start_date;
                       if (projectStart) {
                         const startDate = new Date(projectStart).toISOString().split('T')[0];
                         return startDate > today ? startDate : today;
@@ -1487,13 +1526,13 @@ export default function ProjectDetail() {
                       return today;
                     })()}
                     max={(() => {
-                      const projectEnd = (project as any)?.expected_end || project?.end_date || project?.endDate;
+                      const projectEnd = project?.expected_end;
                       return projectEnd ? new Date(projectEnd).toISOString().split('T')[0] : undefined;
                     })()}
                   />
                   {project && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Project timeline: {formatDate(project.start_date || project.startDate)} - {formatDate((project as any).expected_end || project.end_date || project.endDate)}
+                      Project timeline: {formatDate(project.start_date)} - {formatDate(project.expected_end)}
                     </p>
                   )}
                 </div>

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import {
   CheckCircle,
@@ -31,13 +31,13 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/apis";
-import type { Employee, Onboarding, CreateOnboardingData, OnboardingTask } from "@/apis/types";
+import { useHR } from "@/hooks/useHR";
 import { useToast } from "@/hooks/use-toast";
+import type { Employee, Onboarding, CreateOnboardingData, OnboardingTask } from "@/apis";
 
 // Helper type for UI - with completion tracking
 interface OnboardingWithTaskList extends Omit<Onboarding, "checklist"> {
-  checklist: OnboardingTask[]; // Using the proper OnboardingTask type
+  checklist: OnboardingTask[];
   employee?: Employee;
 }
 
@@ -45,9 +45,26 @@ export default function OnboardingTracker() {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const [onboardings, setOnboardings] = useState<OnboardingWithTaskList[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Use the HR hook for API calls
+  const { 
+    employees, 
+    onboardings, 
+    isLoadingEmployees, 
+    isLoadingOnboardings,
+    onboardingsError,
+    fetchEmployees,
+    fetchOnboardings,
+    createOnboarding,
+    completeOnboarding,
+    updateOnboardingChecklist
+  } = useHR();
+
+  // Create a stable reference to toast for use in callbacks
+  const toastRef = useCallback((options: any) => {
+    toast(options);
+  }, [toast]);
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingOnboarding, setEditingOnboarding] = useState<string | null>(null);
@@ -82,53 +99,31 @@ export default function OnboardingTracker() {
     ]
   });
 
-  // Fetch data on component mount
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [onboardingsData, employeesData] = await Promise.all([
-        api.hr.getOnboardings(),
-        api.hr.getEmployees()
-      ]);
-      
-      // Transform onboarding data to match UI expectations
-      const transformedOnboardings = onboardingsData.map((onboarding): OnboardingWithTaskList => {
-        // Find the employee data using staff_id
-        const employee = employeesData.find(emp => emp.staff_id === onboarding.employee_id);
-        
-        // Normalize checklist data to ensure consistent structure
-        const normalizedChecklist = (onboarding.checklist || []).map((item: any) => {
-          if (typeof item === 'string') {
-            return { task: item, completed: false };
-          } else if (item && typeof item === 'object') {
-            return {
-              task: item.task || item.description || 'Unnamed Task',
-              completed: Boolean(item.completed)
-            };
-          } else {
-            return { task: 'Invalid Task', completed: false };
-          }
-        });
-        
+  // Transform onboarding data to match UI expectations
+  const transformedOnboardings: OnboardingWithTaskList[] = onboardings.map((onboarding): OnboardingWithTaskList => {
+    // Find the employee data using staff_id
+    const employee = employees.find(emp => emp.staff_id === onboarding.employee_id);
+    
+    // Normalize checklist data to ensure consistent structure
+    const normalizedChecklist = (onboarding.checklist || []).map((item: any) => {
+      if (typeof item === 'string') {
+        return { task: item, completed: false };
+      } else if (item && typeof item === 'object') {
         return {
-          ...onboarding,
-          employee,
-          checklist: normalizedChecklist
+          task: item.task || item.description || 'Unnamed Task',
+          completed: Boolean(item.completed)
         };
-      });
-
-      setOnboardings(transformedOnboardings);
-      setEmployees(employeesData);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      } else {
+        return { task: 'Invalid Task', completed: false };
+      }
+    });
+    
+    return {
+      ...onboarding,
+      employee,
+      checklist: normalizedChecklist
+    };
+  });
 
   // Handle form submission for creating onboarding
   const handleCreateOnboarding = async (e: React.FormEvent) => {
@@ -137,16 +132,8 @@ export default function OnboardingTracker() {
 
     try {
       setIsSubmitting(true);
-      const createdOnboarding = await api.hr.createOnboarding(newOnboarding);
+      await createOnboarding(newOnboarding);
       
-      // Transform and add to state
-      const employee = employees.find(emp => emp.staff_id === createdOnboarding.employee_id);
-      const transformedOnboarding: OnboardingWithTaskList = {
-        ...createdOnboarding,
-        employee
-      };
-      
-      setOnboardings(prev => [...prev, transformedOnboarding]);
       setIsCreateDialogOpen(false);
       
       // Reset form
@@ -167,7 +154,10 @@ export default function OnboardingTracker() {
       // Reset search
       setEmployeeSearchTerm("");
       
-      toast({
+      // Refresh data
+      await fetchOnboardings();
+      
+      toastRef({
         title: "Onboarding process created successfully!",
         description: "The onboarding process has been created successfully."
       });
@@ -177,9 +167,10 @@ export default function OnboardingTracker() {
                           error.response?.data?.error || 
                           error.message || 
                           'Failed to create onboarding process. Please try again.';
-      toast({
+      toastRef({
         title: "Error",
-        description: errorMessage
+        description: errorMessage,
+        variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
@@ -189,29 +180,19 @@ export default function OnboardingTracker() {
   // Mark onboarding as completed using the complete endpoint
   const markAsCompleted = async (onboardingId: string) => {
     try {
-      // Use the HR service complete method
-      await api.hr.completeOnboarding(onboardingId);
+      await completeOnboarding(onboardingId);
+      await fetchOnboardings(); // Refresh data
 
-      // Update local state
-      setOnboardings(prev => prev.map(o => 
-        o.id === onboardingId 
-          ? {
-              ...o,
-              status: 'completed',
-              completed: true
-            }
-          : o
-      ));
-
-      toast({
+      toastRef({
         title: "Onboarding completed!",
         description: "The onboarding process has been marked as completed."
       });
     } catch (error) {
       console.error('Error marking as completed:', error);
-      toast({
+      toastRef({
         title: "Error",
-        description: 'Failed to mark onboarding as completed. Please try again.'
+        description: 'Failed to mark onboarding as completed. Please try again.',
+        variant: "destructive"
       });
     }
   };
@@ -219,31 +200,23 @@ export default function OnboardingTracker() {
   // Add task to list
   const addTaskToList = async (onboardingId: string, task: string) => {
     try {
-      const onboarding = onboardings.find(o => o.id === onboardingId);
+      const onboarding = transformedOnboardings.find(o => o.id === onboardingId);
       if (!onboarding) return;
 
       // Add task to the list with completed false
       const updatedChecklist = [...onboarding.checklist, { task, completed: false }];
       
-      // Call the HR service update method
-      await api.hr.updateOnboardingChecklist(onboardingId, {
+      await updateOnboardingChecklist(onboardingId, {
         checklist: updatedChecklist
       });
       
-      // Update local state
-      setOnboardings(prev => prev.map(o => 
-        o.id === onboardingId 
-          ? {
-              ...o,
-              checklist: updatedChecklist
-            }
-          : o
-      ));
+      await fetchOnboardings(); // Refresh data
     } catch (error) {
       console.error('Error adding task:', error);
-      toast({
+      toastRef({
         title: "Error",
-        description: 'Failed to add task. Please try again.'
+        description: 'Failed to add task. Please try again.',
+        variant: "destructive"
       });
     }
   };
@@ -251,7 +224,7 @@ export default function OnboardingTracker() {
   // Mark task as complete/incomplete using the checklist endpoint
   const updateTaskCompletion = async (onboardingId: string, taskIndex: number, completed: boolean) => {
     try {
-      const onboarding = onboardings.find(o => o.id === onboardingId);
+      const onboarding = transformedOnboardings.find(o => o.id === onboardingId);
       if (!onboarding) return;
 
       // Update the specific task's completion status
@@ -259,25 +232,17 @@ export default function OnboardingTracker() {
         index === taskIndex ? { ...item, completed } : item
       );
       
-      // Use the HR service checklist update method
-      await api.hr.updateOnboardingChecklist(onboardingId, {
+      await updateOnboardingChecklist(onboardingId, {
         checklist: updatedChecklist
       });
       
-      // Update local state
-      setOnboardings(prev => prev.map(o => 
-        o.id === onboardingId 
-          ? {
-              ...o,
-              checklist: updatedChecklist
-            }
-          : o
-      ));
+      await fetchOnboardings(); // Refresh data
     } catch (error) {
       console.error('Error updating task completion:', error);
-      toast({
+      toastRef({
         title: "Error",
-        description: 'Failed to update task completion. Please try again.'
+        description: 'Failed to update task completion. Please try again.',
+        variant: "destructive"
       });
     }
   };
@@ -290,7 +255,7 @@ export default function OnboardingTracker() {
   };
 
   // Filter onboarding processes based on search and status
-  const filteredOnboardings = onboardings.filter(onboarding => {
+  const filteredOnboardings = transformedOnboardings.filter(onboarding => {
     // Search filter
     const searchMatch = !searchTerm || 
       `${onboarding.employee?.first_name || ''} ${onboarding.employee?.last_name || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -306,7 +271,7 @@ export default function OnboardingTracker() {
 
   // Get available employees (not already in onboarding)
   const availableEmployees = employees.filter(emp => 
-    !onboardings.some(onb => onb.employee_id === emp.staff_id)
+    !transformedOnboardings.some(onb => onb.employee_id === emp.staff_id)
   );
 
   // Filter employees based on search term
@@ -408,31 +373,61 @@ export default function OnboardingTracker() {
 
   // Calculate statistics
   const stats = {
-    total: onboardings.length,
-    completed: onboardings.filter(o => o.status === 'completed').length,
-    inProgress: onboardings.filter(o => o.status === 'in_progress').length,
+    total: transformedOnboardings.length,
+    completed: transformedOnboardings.filter(o => o.status === 'completed').length,
+    inProgress: transformedOnboardings.filter(o => o.status === 'in_progress').length,
     avgDuration: 14 // This could be calculated from completed onboardings
   };
 
-  const userForLayout = {
-    name: user ? (`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email) : 'Guest',
-    email: user?.email || 'guest@example.com',
-    role: user?.role || 'User',
-    avatarUrl: user?.avatar_url || undefined
-  };
-
-  if (loading) {
+  if (isLoadingEmployees || isLoadingOnboardings) {
     return (
-      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading onboarding data...</span>
+        </div>
+      </ExtensibleLayout>
+    );
+  }
+
+  // Show error state if there's an error
+  if (onboardingsError) {
+    return (
+      <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading onboarding data: {onboardingsError}</p>
+            <div className="space-y-2">
+              <Button onClick={fetchOnboardings}>Retry</Button>
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://startup-flo-backend.onrender.com'}/hr/setup-module-access`, {
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('sf_access_token')}`,
+                        'Content-Type': 'application/json'
+                      }
+                    });
+                    const result = await response.json();
+                    toastRef({ title: "Success", description: "HR module access setup completed. Please refresh the page." });
+                  } catch (error) {
+                    console.error("Setup failed:", error);
+                    toastRef({ title: "Error", description: "Failed to setup HR module access.", variant: "destructive" });
+                  }
+                }}
+              >
+                Setup HR Access
+              </Button>
+            </div>
+          </div>
         </div>
       </ExtensibleLayout>
     );
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" user={userForLayout}>
+    <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -796,34 +791,34 @@ export default function OnboardingTracker() {
                             </td>
                             <td className="py-4 px-4">
                               <div className="flex items-center space-x-2">
-                                                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  // Ensure data is normalized before storing in localStorage
-                                  const normalizedOnboarding = {
-                                    ...onboarding,
-                                    checklist: onboarding.checklist.map((item: any) => {
-                                      if (typeof item === 'string') {
-                                        return { task: item, completed: false };
-                                      } else if (item && typeof item === 'object') {
-                                        return {
-                                          task: item.task || item.description || 'Unnamed Task',
-                                          completed: Boolean(item.completed)
-                                        };
-                                      } else {
-                                        return { task: 'Invalid Task', completed: false };
-                                      }
-                                    })
-                                  };
-                                  
-                                  // Store normalized onboarding data in localStorage for the view page
-                                  localStorage.setItem('currentOnboarding', JSON.stringify(normalizedOnboarding));
-                                  router.push(`/hr/onboarding/${onboarding.id}`);
-                                }}
-                              >
-                                View
-                              </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Ensure data is normalized before storing in localStorage
+                                    const normalizedOnboarding = {
+                                      ...onboarding,
+                                      checklist: onboarding.checklist.map((item: any) => {
+                                        if (typeof item === 'string') {
+                                          return { task: item, completed: false };
+                                        } else if (item && typeof item === 'object') {
+                                          return {
+                                            task: item.task || item.description || 'Unnamed Task',
+                                            completed: Boolean(item.completed)
+                                          };
+                                        } else {
+                                          return { task: 'Invalid Task', completed: false };
+                                        }
+                                      })
+                                    };
+                                    
+                                    // Store normalized onboarding data in localStorage for the view page
+                                    localStorage.setItem('currentOnboarding', JSON.stringify(normalizedOnboarding));
+                                    router.push(`/hr/onboarding/${onboarding.id}`);
+                                  }}
+                                >
+                                  View
+                                </Button>
                                 {onboarding.status !== 'completed' && (
                                   <Button
                                     variant="outline"

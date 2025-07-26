@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useMemo } from "react";
 
 // Define a more specific type for sidebar data if possible, or use a generic
 // For now, we'll keep it flexible but acknowledge it might need refinement
@@ -46,16 +46,18 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     }
   };
 
+  const value = useMemo(() => ({
+    currentSidebar,
+    setSidebar,
+    sidebarData,
+    setSidebarData,
+    sidebarHistory,
+    pushSidebar,
+    popSidebar
+  }), [currentSidebar, sidebarData, sidebarHistory]);
+
   return (
-    <SidebarContext.Provider value={{
-      currentSidebar,
-      setSidebar,
-      sidebarData,
-      setSidebarData,
-      sidebarHistory,
-      pushSidebar,
-      popSidebar
-    }}>
+    <SidebarContext.Provider value={value}>
       {children}
     </SidebarContext.Provider>
   );

@@ -37,6 +37,10 @@ export default function ContactsPage() {
     handleEditContact,
     handleDeleteContact,
     resetFormData,
+    sortKey,
+    setSortKey,
+    sortDirection,
+    setSortDirection,
   } = useContacts();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -106,7 +110,7 @@ export default function ContactsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
               <Users2 className="h-8 w-8" />
-              Contacts & Accounts
+              Contacts
             </h1>
             <p className="text-gray-600 mt-2">Manage your customer contacts and their relationships</p>
           </div>
@@ -146,6 +150,10 @@ export default function ContactsPage() {
           setLeadFilter={setLeadFilter}
           accounts={accounts}
           leads={leads}
+          sortKey={sortKey}
+          setSortKey={setSortKey}
+          sortDirection={sortDirection}
+          setSortDirection={setSortDirection}
         />
 
         {loading ? (

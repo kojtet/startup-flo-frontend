@@ -4,51 +4,69 @@ import { assetsSidebarSections } from "@/components/sidebars/AssetsSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/apis";
-import type { Asset, AssetSummaryReport, AssetMaintenance } from "@/apis/types";
-import { Archive, DollarSign, Wrench, TrendingDown, Loader2, Users, Building, AlertTriangle, CheckCircle, Clock, AlertCircle } from "lucide-react";
-import { transformUserForLayout } from '@/lib/utils';
+import type { Asset, AssetCategory } from "@/apis/types";
+import { Archive, DollarSign, Wrench, TrendingDown, Loader2, Building, AlertTriangle, CheckCircle, Clock, AlertCircle, Plus, RefreshCw } from "lucide-react";
 
 export default function AssetsDashboard() {
-  const { user } = useAuth();
+  const { user, apiClient } = useAuth() as any;
   const { toast } = useToast();
 
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [assetSummary, setAssetSummary] = useState<AssetSummaryReport | null>(null);
-  const [recentMaintenance, setRecentMaintenance] = useState<AssetMaintenance[]>([]);
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    category_id: '',
+    serial_number: '',
+    purchase_date: '',
+    purchase_cost: 0,
+    status: 'active' as Asset['status'],
+    location: '',
+    description: '',
+    warranty_expiry: '',
+    depreciation_method: 'straight_line' as 'straight_line' | 'declining_balance' | 'sum_of_years',
+    useful_life_years: 4,
+    asset_tag: '',
+    depreciation_start: ''
+  });
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (user?.company_id) {
+      fetchDashboardData();
+    }
+  }, [user?.company_id]);
 
   const fetchDashboardData = async () => {
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       
       // Fetch data in parallel for better performance
-      const [assetsResponse, summaryResponse] = await Promise.all([
-        api.assets.getAssets({ limit: 100 }),
-        api.assets.getAssetSummary(),
+      const [assetsResponse, categoriesResponse] = await Promise.all([
+        apiClient.get('/assets/assets'),
+        apiClient.get('/asset/categories'),
       ]);
 
-      setAssets(assetsResponse || []);
-      setAssetSummary(summaryResponse);
-
-      // Get recent maintenance for activity feed
-      if (assetsResponse && assetsResponse.length > 0) {
-        const maintenancePromises = assetsResponse.slice(0, 5).map(asset => 
-          api.assets.getAssetMaintenance(asset.id).catch(() => [])
-        );
-        const maintenanceResults = await Promise.all(maintenancePromises);
-        const allMaintenance = maintenanceResults.flat().sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        setRecentMaintenance(allMaintenance.slice(0, 5));
-      }
+      setAssets(assetsResponse.data || []);
+      setCategories(categoriesResponse.data || []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -63,6 +81,15 @@ export default function AssetsDashboard() {
   };
 
   const handleRefresh = async () => {
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setRefreshing(true);
     await fetchDashboardData();
     setRefreshing(false);
@@ -72,25 +99,108 @@ export default function AssetsDashboard() {
     });
   };
 
-  const calculateMetrics = () => {
-    if (!assetSummary) {
-      return {
-        totalAssets: assets.length,
-        totalValue: 0,
-        maintenanceDue: 0,
-        monthlyDepreciation: 0
-      };
+  const resetFormData = () => {
+    setFormData({
+      name: '',
+      category_id: '',
+      serial_number: '',
+      purchase_date: '',
+      purchase_cost: 0,
+      status: 'active',
+      location: '',
+      description: '',
+      warranty_expiry: '',
+      depreciation_method: 'straight_line',
+      useful_life_years: 4,
+      asset_tag: '',
+      depreciation_start: ''
+    });
+  };
+
+  const handleCreateAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
     }
 
-    const maintenanceDue = recentMaintenance.filter(m => 
-      m.status === 'scheduled' && new Date(m.scheduled_date) <= new Date()
-    ).length;
+    try {
+      setFormLoading(true);
+      
+      const assetPayload = {
+        ...formData,
+        purchase_cost: parseFloat(formData.purchase_cost.toString()),
+        useful_life_years: parseInt(formData.useful_life_years.toString())
+      };
+
+      await apiClient.post('/assets/assets', assetPayload);
+      
+      // Refresh the assets list
+      await fetchDashboardData();
+      
+      // Close dialog and reset form
+      setIsCreateDialogOpen(false);
+      resetFormData();
+      
+      toast({
+        title: "Success",
+        description: "Asset created successfully"
+      });
+    } catch (error: any) {
+      console.error('Error creating asset:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to create asset",
+        variant: "destructive"
+      });
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const calculateMetrics = () => {
+    const totalAssets = assets.length;
+    const totalValue = assets.reduce((sum, asset) => sum + asset.current_value, 0);
+    
+    // Calculate assets by status
+    const statusCounts = assets.reduce((acc, asset) => {
+      acc[asset.status] = (acc[asset.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Calculate assets by category
+    const categoryCounts = assets.reduce((acc, asset) => {
+      const categoryName = asset.category?.name || 'Unknown';
+      if (!acc[categoryName]) {
+        acc[categoryName] = { count: 0, value: 0 };
+      }
+      acc[categoryName].count += 1;
+      acc[categoryName].value += asset.current_value;
+      return acc;
+    }, {} as Record<string, { count: number; value: number }>);
+
+    // Calculate assets by location
+    const locationCounts = assets.reduce((acc, asset) => {
+      const location = asset.location || 'Unknown';
+      if (!acc[location]) {
+        acc[location] = { count: 0, value: 0 };
+      }
+      acc[location].count += 1;
+      acc[location].value += asset.current_value;
+      return acc;
+    }, {} as Record<string, { count: number; value: number }>);
 
     return {
-      totalAssets: assetSummary.total_assets,
-      totalValue: assetSummary.total_value,
-      maintenanceDue,
-      monthlyDepreciation: 12450 // Mock data for now
+      totalAssets,
+      totalValue,
+      statusCounts,
+      categoryCounts,
+      locationCounts
     };
   };
 
@@ -105,22 +215,216 @@ export default function AssetsDashboard() {
     }
   };
 
-  const getMaintenanceStatusIcon = (status: AssetMaintenance['status']) => {
-    console.log('Maintenance status:', status);
+  const getStatusIcon = (status: Asset['status']) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'in_progress': return <Clock className="h-4 w-4 text-blue-500" />;
-      case 'scheduled': return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-      case 'cancelled': return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'active': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'in_stock': return <Archive className="h-4 w-4 text-blue-500" />;
+      case 'assigned': return <Building className="h-4 w-4 text-purple-500" />;
+      case 'maintenance': return <Wrench className="h-4 w-4 text-yellow-500" />;
+      case 'retired': return <AlertTriangle className="h-4 w-4 text-gray-500" />;
       default: return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
+
+  const AssetForm = () => (
+    <form onSubmit={handleCreateAsset} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Asset Name *</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            required
+            placeholder="e.g., MacBook Pro 2024"
+          />
+        </div>
+        <div>
+          <Label htmlFor="asset_tag">Asset Tag *</Label>
+          <Input
+            id="asset_tag"
+            value={formData.asset_tag}
+            onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
+            required
+            placeholder="e.g., SDG3223"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="category_id">Category *</Label>
+          <Select 
+            value={formData.category_id} 
+            onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
+            required
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map(category => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="serial_number">Serial Number *</Label>
+          <Input
+            id="serial_number"
+            value={formData.serial_number}
+            onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))}
+            required
+            placeholder="e.g., MBP2024-123456"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="purchase_date">Purchase Date *</Label>
+          <Input
+            id="purchase_date"
+            type="date"
+            value={formData.purchase_date}
+            onChange={(e) => setFormData(prev => ({ ...prev, purchase_date: e.target.value }))}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="purchase_cost">Purchase Cost *</Label>
+          <Input
+            id="purchase_cost"
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.purchase_cost}
+            onChange={(e) => setFormData(prev => ({ ...prev, purchase_cost: parseFloat(e.target.value) || 0 }))}
+            required
+            placeholder="0.00"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="status">Status *</Label>
+          <Select 
+            value={formData.status} 
+            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Asset['status'] }))}
+            required
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="in_stock">In Stock</SelectItem>
+              <SelectItem value="assigned">Assigned</SelectItem>
+              <SelectItem value="maintenance">Maintenance</SelectItem>
+              <SelectItem value="retired">Retired</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="location">Location *</Label>
+          <Input
+            id="location"
+            value={formData.location}
+            onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+            required
+            placeholder="e.g., Office A"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="warranty_expiry">Warranty Expiry</Label>
+          <Input
+            id="warranty_expiry"
+            type="date"
+            value={formData.warranty_expiry}
+            onChange={(e) => setFormData(prev => ({ ...prev, warranty_expiry: e.target.value }))}
+          />
+        </div>
+        <div>
+          <Label htmlFor="depreciation_start">Depreciation Start Date</Label>
+          <Input
+            id="depreciation_start"
+            type="date"
+            value={formData.depreciation_start}
+            onChange={(e) => setFormData(prev => ({ ...prev, depreciation_start: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="depreciation_method">Depreciation Method</Label>
+          <Select 
+            value={formData.depreciation_method} 
+            onValueChange={(value) => setFormData(prev => ({ ...prev, depreciation_method: value as 'straight_line' | 'declining_balance' | 'sum_of_years' }))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="straight_line">Straight Line</SelectItem>
+              <SelectItem value="declining_balance">Declining Balance</SelectItem>
+              <SelectItem value="sum_of_years">Sum of Years</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="useful_life_years">Useful Life (Years)</Label>
+          <Input
+            id="useful_life_years"
+            type="number"
+            min="1"
+            max="50"
+            value={formData.useful_life_years}
+            onChange={(e) => setFormData(prev => ({ ...prev, useful_life_years: parseInt(e.target.value) || 4 }))}
+            placeholder="4"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Describe the asset..."
+          rows={3}
+        />
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => setIsCreateDialogOpen(false)}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={formLoading}>
+          {formLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          Create Asset
+        </Button>
+      </div>
+    </form>
+  );
 
   const metrics = calculateMetrics();
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={null}>
+      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -131,8 +435,7 @@ export default function AssetsDashboard() {
   return (
     <ExtensibleLayout 
       moduleSidebar={assetsSidebarSections} 
-      moduleTitle="Asset Management" 
-      user={transformUserForLayout(user)}
+      moduleTitle="Asset Management"
     >
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -149,10 +452,29 @@ export default function AssetsDashboard() {
               {refreshing ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Archive className="mr-2 h-4 w-4" />
+                <RefreshCw className="mr-2 h-4 w-4" />
               )}
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+              setIsCreateDialogOpen(open);
+              if (open) {
+                resetFormData();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Asset
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Asset</DialogTitle>
+                </DialogHeader>
+                <AssetForm />
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -179,7 +501,7 @@ export default function AssetsDashboard() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Asset Value</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Value</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -190,124 +512,105 @@ export default function AssetsDashboard() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Maintenance Due</CardTitle>
+                  <CardTitle className="text-sm font-medium">Categories</CardTitle>
                   <Wrench className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.maintenanceDue}</div>
-                  <p className="text-xs text-muted-foreground">Assets need attention</p>
+                  <div className="text-2xl font-bold">{categories.length}</div>
+                  <p className="text-xs text-muted-foreground">Asset categories</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Depreciation</CardTitle>
+                  <CardTitle className="text-sm font-medium">Active Assets</CardTitle>
                   <TrendingDown className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${metrics.monthlyDepreciation.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground">This month</p>
+                  <div className="text-2xl font-bold">{metrics.statusCounts.active || 0}</div>
+                  <p className="text-xs text-muted-foreground">Currently in use</p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Asset Status Overview */}
-            {assetSummary && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Asset Status Overview</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {assetSummary.by_status.map((statusData, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <Badge className={`${getStatusBadgeColor(statusData.status)} border-0`}>
-                              {statusData.status.replace('_', ' ').toUpperCase()}
-                            </Badge>
-                            <span className="text-sm font-medium">{statusData.count} assets</span>
-                          </div>
-                          <div className="text-sm font-semibold">
-                            ${statusData.value.toLocaleString()}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Asset Categories</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {assetSummary.by_category.slice(0, 5).map((categoryData, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                            <span className="text-sm font-medium">{categoryData.category_name}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold">{categoryData.count} assets</div>
-                            <div className="text-xs text-gray-500">${categoryData.value.toLocaleString()}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Recent Activities and Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Asset Activities</CardTitle>
+                  <CardTitle>Asset Status Overview</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {recentMaintenance.length > 0 ? (
-                      recentMaintenance.map((maintenance, index) => (
-                        <div key={index} className="flex items-center space-x-3">
-                          {getMaintenanceStatusIcon(maintenance.status)}
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{maintenance.title}</p>
-                            <p className="text-xs text-gray-500">
-                              {maintenance.asset?.name} - {new Date(maintenance.scheduled_date).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Badge className={`${getStatusBadgeColor('active')} border-0 text-xs`}>
-                            {maintenance.status}
+                    {Object.entries(metrics.statusCounts).map(([status, count]) => (
+                      <div key={status} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {getStatusIcon(status as Asset['status'])}
+                          <Badge className={`${getStatusBadgeColor(status as Asset['status'])} border-0`}>
+                            {status.replace('_', ' ').toUpperCase()}
                           </Badge>
+                          <span className="text-sm font-medium">{count} assets</span>
                         </div>
-                      ))
-                    ) : (
-                      <>
+                        <div className="text-sm font-semibold">
+                          ${assets
+                            .filter(a => a.status === status)
+                            .reduce((sum, asset) => sum + asset.current_value, 0)
+                            .toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Asset Categories</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {Object.entries(metrics.categoryCounts).slice(0, 5).map(([categoryName, data]) => (
+                      <div key={categoryName} className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">New laptop assigned</p>
-                            <p className="text-xs text-gray-500">MacBook Pro to John Doe</p>
-                          </div>
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span className="text-sm font-medium">{categoryName}</span>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Maintenance scheduled</p>
-                            <p className="text-xs text-gray-500">Server rack cleaning</p>
-                          </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{data.count} assets</div>
+                          <div className="text-xs text-gray-500">${data.value.toLocaleString()}</div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Asset retired</p>
-                            <p className="text-xs text-gray-500">Old printer disposed</p>
-                          </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Assets and Quick Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Assets</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {assets.slice(0, 5).map((asset) => (
+                      <div key={asset.id} className="flex items-center space-x-3">
+                        {getStatusIcon(asset.status)}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{asset.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {asset.asset_tag} - {asset.category?.name} - ${asset.current_value.toLocaleString()}
+                          </p>
                         </div>
-                      </>
+                        <Badge className={`${getStatusBadgeColor(asset.status)} border-0 text-xs`}>
+                          {asset.status}
+                        </Badge>
+                      </div>
+                    ))}
+                    {assets.length === 0 && (
+                      <div className="text-center py-4 text-gray-500">
+                        No assets found. Add your first asset to get started.
+                      </div>
                     )}
                   </div>
                 </CardContent>
@@ -326,18 +629,18 @@ export default function AssetsDashboard() {
                     </Button>
                     <Button variant="outline" className="p-4 h-auto text-left flex-col items-start">
                       <Wrench className="h-6 w-6 text-green-600 mb-2" />
-                      <p className="font-medium">Schedule Maintenance</p>
-                      <p className="text-xs text-gray-500">Plan upkeep</p>
+                      <p className="font-medium">Manage Categories</p>
+                      <p className="text-xs text-gray-500">Organize assets</p>
                     </Button>
                     <Button variant="outline" className="p-4 h-auto text-left flex-col items-start">
                       <DollarSign className="h-6 w-6 text-purple-600 mb-2" />
-                      <p className="font-medium">View Depreciation</p>
-                      <p className="text-xs text-gray-500">Asset value tracking</p>
+                      <p className="font-medium">View Reports</p>
+                      <p className="text-xs text-gray-500">Asset analytics</p>
                     </Button>
                     <Button variant="outline" className="p-4 h-auto text-left flex-col items-start">
                       <TrendingDown className="h-6 w-6 text-orange-600 mb-2" />
-                      <p className="font-medium">Generate Report</p>
-                      <p className="text-xs text-gray-500">Asset analytics</p>
+                      <p className="font-medium">Export Data</p>
+                      <p className="text-xs text-gray-500">Download reports</p>
                     </Button>
                   </div>
                 </CardContent>
@@ -345,7 +648,7 @@ export default function AssetsDashboard() {
             </div>
 
             {/* Asset Locations Overview */}
-            {assetSummary && assetSummary.by_location && assetSummary.by_location.length > 0 && (
+            {Object.keys(metrics.locationCounts).length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -355,15 +658,15 @@ export default function AssetsDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {assetSummary.by_location.slice(0, 6).map((locationData, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
+                    {Object.entries(metrics.locationCounts).slice(0, 6).map(([location, data]) => (
+                      <div key={location} className="p-4 border rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">{locationData.location_name}</h4>
+                          <h4 className="font-medium">{location}</h4>
                           <Building className="h-4 w-4 text-gray-400" />
                         </div>
                         <div className="text-sm text-gray-600">
-                          <div>{locationData.count} assets</div>
-                          <div className="font-semibold">${locationData.value.toLocaleString()}</div>
+                          <div>{data.count} assets</div>
+                          <div className="font-semibold">${data.value.toLocaleString()}</div>
                         </div>
                       </div>
                     ))}

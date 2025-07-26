@@ -676,3 +676,65 @@ export interface CreateTransactionData {
 export interface UpdateTransactionData extends Partial<CreateTransactionData> {
   // All fields are optional for updates
 } 
+
+// Asset types
+export interface Asset {
+  id: string;
+  company_id: string;
+  category_id: string;
+  name: string;
+  asset_tag: string;
+  serial_number: string;
+  purchase_date: string;
+  purchase_cost: number;
+  depreciation_start: string;
+  current_value: number;
+  status: "active" | "in_stock" | "assigned" | "maintenance" | "retired";
+  location: string;
+  notes: string | null;
+  created_at: string;
+  category: {
+    name: string;
+  };
+}
+
+export interface AssetCategory {
+  id: string;
+  company_id: string;
+  name: string;
+  depreciation_method: "straight_line" | "declining_balance" | "sum_of_years";
+  useful_life_months: number;
+  salvage_percentage: number;
+  created_at: string;
+  description: string;
+  salvage_value_percentage: number | null;
+}
+
+export interface CreateAssetData {
+  category_id: string;
+  name: string;
+  asset_tag: string;
+  serial_number: string;
+  purchase_date: string;
+  purchase_cost: number;
+  depreciation_start: string;
+  status: "active" | "in_stock" | "assigned" | "maintenance" | "retired";
+  location: string;
+  notes?: string;
+}
+
+export interface UpdateAssetData extends Partial<CreateAssetData> {
+  // All fields are optional since this extends Partial<CreateAssetData>
+}
+
+export interface CreateAssetCategoryData {
+  name: string;
+  description: string;
+  depreciation_rate: number;
+  depreciation_method: "straight_line" | "declining_balance" | "sum_of_years";
+  useful_life_months: number;
+}
+
+export interface UpdateAssetCategoryData extends Partial<CreateAssetCategoryData> {
+  // All fields are optional since this extends Partial<CreateAssetCategoryData>
+}

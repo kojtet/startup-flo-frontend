@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/apis';
 import type { AssetCategory, CreateAssetCategoryData, UpdateAssetCategoryData } from '@/apis/types';
 import { Tag, Plus, Search, Edit, Trash2, Loader2, MoreHorizontal, Package, Archive } from 'lucide-react';
 import {
@@ -31,7 +30,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 export default function AssetCategoriesPage() {
-  const { user } = useAuth();
+  const { user, apiClient } = useAuth() as any;
   const { toast } = useToast();
 
   const [categories, setCategories] = useState<AssetCategory[]>([]);
@@ -45,20 +44,31 @@ export default function AssetCategoriesPage() {
   const [formData, setFormData] = useState<CreateAssetCategoryData>({
     name: '',
     description: '',
-    depreciation_rate: 0,
+    depreciation_rate: 25,
     depreciation_method: 'straight_line',
     useful_life_months: 60
   });
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    if (user?.company_id) {
+      fetchCategories();
+    }
+  }, [user?.company_id]);
 
   const fetchCategories = async () => {
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await api.assets.getAssetCategories();
-      setCategories(response || []);
+      const response = await apiClient.get('/assets/categories');
+      setCategories(response.data || []);
     } catch (error) {
       toast({
         title: "Error",
@@ -72,20 +82,31 @@ export default function AssetCategoriesPage() {
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setFormLoading(true);
-      const newCategory = await api.assets.createAssetCategory(formData);
-      setCategories(prev => [newCategory, ...prev]);
+      const response = await apiClient.post('/assets/categories', formData);
+      setCategories(prev => [response.data, ...prev]);
       setIsCreateDialogOpen(false);
       resetForm();
       toast({
         title: "Success",
         description: "Category created successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error creating category:', error);
       toast({
         title: "Error",
-        description: "Failed to create category",
+        description: error.response?.data?.message || "Failed to create category",
         variant: "destructive"
       });
     } finally {
@@ -97,17 +118,28 @@ export default function AssetCategoriesPage() {
     e.preventDefault();
     if (!selectedCategory) return;
 
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setFormLoading(true);
       const updateData: UpdateAssetCategoryData = {
         name: formData.name,
         description: formData.description,
-        depreciation_rate: formData.depreciation_rate
+        depreciation_rate: formData.depreciation_rate,
+        depreciation_method: formData.depreciation_method,
+        useful_life_months: formData.useful_life_months
       };
 
-      const updatedCategory = await api.assets.updateAssetCategory(selectedCategory.id, updateData);
+      const response = await apiClient.patch(`/assets/categories/${selectedCategory.id}`, updateData);
       setCategories(prev => prev.map(cat => 
-        cat.id === selectedCategory.id ? updatedCategory : cat
+        cat.id === selectedCategory.id ? response.data : cat
       ));
       setIsEditDialogOpen(false);
       setSelectedCategory(null);
@@ -115,10 +147,11 @@ export default function AssetCategoriesPage() {
         title: "Success",
         description: "Category updated successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating category:', error);
       toast({
         title: "Error",
-        description: "Failed to update category",
+        description: error.response?.data?.message || "Failed to update category",
         variant: "destructive"
       });
     } finally {
@@ -129,17 +162,27 @@ export default function AssetCategoriesPage() {
   const handleDeleteCategory = async (categoryId: string) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
 
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      await api.assets.deleteAssetCategory(categoryId);
+      await apiClient.delete(`/assets/categories/${categoryId}`);
       setCategories(prev => prev.filter(cat => cat.id !== categoryId));
       toast({
         title: "Success",
         description: "Category deleted successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
       toast({
         title: "Error",
-        description: "Failed to delete category",
+        description: error.response?.data?.message || "Failed to delete category",
         variant: "destructive"
       });
     }
@@ -150,7 +193,7 @@ export default function AssetCategoriesPage() {
     setFormData({
       name: category.name,
       description: category.description || '',
-      depreciation_rate: 0, // Default value since it's not in AssetCategory
+      depreciation_rate: 25, // Default value since it's not in AssetCategory
       depreciation_method: category.depreciation_method || 'straight_line',
       useful_life_months: category.useful_life_months || 60
     });
@@ -161,7 +204,7 @@ export default function AssetCategoriesPage() {
     setFormData({
       name: '',
       description: '',
-      depreciation_rate: 0,
+      depreciation_rate: 25,
       depreciation_method: 'straight_line',
       useful_life_months: 60
     });
@@ -175,13 +218,7 @@ export default function AssetCategoriesPage() {
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
-        name: '',
-        email: '',
-        role: '',
-        avatarUrl: '',
-        companyId: ''
-      }}>
+      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -190,13 +227,7 @@ export default function AssetCategoriesPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
-      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
-      email: user.email,
-      role: user.role,
-      avatarUrl: user.avatar_url || '',
-      companyId: user.company_id || ''
-    }}>
+    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -248,6 +279,8 @@ export default function AssetCategoriesPage() {
                         id="depreciation_rate"
                         type="number"
                         step="0.01"
+                        min="0"
+                        max="100"
                         value={formData.depreciation_rate}
                         onChange={(e) => setFormData(prev => ({ ...prev, depreciation_rate: parseFloat(e.target.value) || 0 }))}
                       />
@@ -334,65 +367,62 @@ export default function AssetCategoriesPage() {
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {filteredCategories.map((category) => (
-              <Card key={category.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    <CardTitle className="text-lg">{category.name}</CardTitle>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => openEditDialog(category)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Category
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => handleDeleteCategory(category.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Category
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardHeader>
-                <CardContent>
-                  {category.description && (
-                    <p className="text-sm text-gray-600 mb-4">{category.description}</p>
-                  )}
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Depreciation Method:</span>
-                      <Badge variant="secondary">{category.depreciation_method || 'Not set'}</Badge>
+              <Card key={category.id} className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Tag className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-1">{category.name}</h3>
+                        {category.description && (
+                          <p className="text-gray-600 text-sm">{category.description}</p>
+                        )}
+                      </div>
                     </div>
                     
-                    {category.useful_life_months && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Useful Life:</span>
-                        <span>{Math.round(category.useful_life_months / 12)} years</span>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {category.depreciation_method || 'Not set'}
+                          </Badge>
+                          {category.useful_life_months && (
+                            <Badge variant="outline" className="text-xs">
+                              {Math.round(category.useful_life_months / 12)} years
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Created {new Date(category.created_at).toLocaleDateString()}
+                        </p>
                       </div>
-                    )}
-                    
-                    {category.salvage_percentage && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Salvage Value:</span>
-                        <span>{category.salvage_percentage}%</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Created:</span>
-                      <span>{new Date(category.created_at).toLocaleDateString()}</span>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => openEditDialog(category)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Category
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteCategory(category.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Category
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardContent>
@@ -439,6 +469,8 @@ export default function AssetCategoriesPage() {
                       id="edit_depreciation_rate"
                       type="number"
                       step="0.01"
+                      min="0"
+                      max="100"
                       value={formData.depreciation_rate}
                       onChange={(e) => setFormData(prev => ({ ...prev, depreciation_rate: parseFloat(e.target.value) || 0 }))}
                     />

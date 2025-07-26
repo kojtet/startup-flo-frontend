@@ -2,6 +2,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import type { Lead, Account } from "@/apis/types";
+import { Button } from "@/components/ui/button";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 interface ContactFiltersProps {
   searchTerm: string;
@@ -12,6 +14,10 @@ interface ContactFiltersProps {
   setLeadFilter: (filter: string) => void;
   accounts?: Account[];
   leads?: Lead[];
+  sortKey: string;
+  setSortKey: (value: string) => void;
+  sortDirection: "asc" | "desc";
+  setSortDirection: (value: "asc" | "desc") => void;
 }
 
 export const ContactFilters = ({ 
@@ -22,7 +28,11 @@ export const ContactFilters = ({
   leadFilter, 
   setLeadFilter,
   accounts = [],
-  leads = []
+  leads = [],
+  sortKey,
+  setSortKey,
+  sortDirection,
+  setSortDirection
 }: ContactFiltersProps) => {
   return (
     <div className="flex items-center gap-4 flex-wrap">
@@ -35,7 +45,6 @@ export const ContactFilters = ({
           className="pl-10"
         />
       </div>
-      
       <div className="flex items-center gap-3">
         <div className="w-48">
           <Select value={accountFilter} onValueChange={setAccountFilter}>
@@ -53,7 +62,6 @@ export const ContactFilters = ({
             </SelectContent>
           </Select>
         </div>
-        
         <div className="w-48">
           <Select value={leadFilter} onValueChange={setLeadFilter}>
             <SelectTrigger>
@@ -70,6 +78,27 @@ export const ContactFilters = ({
             </SelectContent>
           </Select>
         </div>
+        {/* Sort Dropdown */}
+        <Select value={sortKey} onValueChange={setSortKey}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_at">Sort by Created Date</SelectItem>
+            <SelectItem value="first_name">Sort by First Name</SelectItem>
+            <SelectItem value="last_name">Sort by Last Name</SelectItem>
+            <SelectItem value="email">Sort by Email</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-10 flex items-center justify-center"
+          onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+          aria-label={sortDirection === "asc" ? "Sort ascending" : "Sort descending"}
+        >
+          {sortDirection === "asc" ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+        </Button>
       </div>
     </div>
   );

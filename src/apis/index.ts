@@ -1,4 +1,5 @@
 // Basic API client and utilities
+
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // Export types
@@ -44,7 +45,13 @@ export type {
   UpdateOpportunityData,
   Campaign,
   CreateCampaignData,
-  UpdateCampaignData
+  UpdateCampaignData,
+  Asset,
+  AssetCategory,
+  CreateAssetData,
+  UpdateAssetData,
+  CreateAssetCategoryData,
+  UpdateAssetCategoryData
 } from './types';
 
 // Extend AxiosRequestConfig to include metadata
@@ -380,12 +387,66 @@ const crmApi = {
   },
 };
 
+// Assets API functions
+const assetsApi = {
+  // Assets
+  getAssets: async (params?: any) => {
+    const response = await api.get('/assets/assets', { params });
+    return response.data;
+  },
+  
+  getAssetById: async (id: string) => {
+    const response = await api.get(`/assets/assets/${id}`);
+    return response.data;
+  },
+  
+  createAsset: async (data: any) => {
+    const response = await api.post('/assets/assets', data);
+    return response.data;
+  },
+  
+  updateAsset: async (id: string, data: any) => {
+    const response = await api.patch(`/assets/assets/${id}`, data);
+    return response.data;
+  },
+  
+  deleteAsset: async (id: string) => {
+    await api.delete(`/assets/assets/${id}`);
+  },
+
+  // Asset Categories
+  getAssetCategories: async () => {
+    const response = await api.get('/asset/categories');
+    return response.data;
+  },
+  
+  getAssetCategoryById: async (id: string) => {
+    const response = await api.get(`/asset/categories/${id}`);
+    return response.data;
+  },
+  
+  createAssetCategory: async (data: any) => {
+    const response = await api.post('/asset/categories', data);
+    return response.data;
+  },
+  
+  updateAssetCategory: async (id: string, data: any) => {
+    const response = await api.patch(`/asset/categories/${id}`, data);
+    return response.data;
+  },
+  
+  deleteAssetCategory: async (id: string) => {
+    await api.delete(`/asset/categories/${id}`);
+  },
+};
+
 // Add TypeScript declaration for the extended api object
 declare module 'axios' {
   interface AxiosInstance {
     crm: typeof crmApi;
+    assets: typeof assetsApi;
   }
 }
 
-// Extend the api object with CRM functionality
-Object.assign(api, { crm: crmApi }); 
+// Extend the api object with CRM and Assets functionality
+Object.assign(api, { crm: crmApi, assets: assetsApi }); 

@@ -18,6 +18,8 @@ export const useAccounts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [industryFilter, setIndustryFilter] = useState("all");
   const [formLoading, setFormLoading] = useState(false);
+  const [sortKey, setSortKey] = useState<string>("created_at"); // default to created_at if available
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -141,11 +143,33 @@ export const useAccounts = () => {
     return matchesSearch && matchesIndustry;
   });
 
+  // Sorting logic
+  const sortedAccounts = [...filteredAccounts].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    // If sorting by name, industry, or website, compare as strings
+    if (["name", "industry", "website"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    // If sorting by created_at or other date, compare as dates
+    if (sortKey === "created_at" && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    // Default fallback
+    return 0;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredAccounts.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedAccounts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedAccounts = filteredAccounts.slice(startIndex, endIndex);
+  const paginatedAccounts = sortedAccounts.slice(startIndex, endIndex);
 
   // Reset to first page when search or filters change
   useEffect(() => {
@@ -155,7 +179,7 @@ export const useAccounts = () => {
   return {
     // State
     accounts: paginatedAccounts,
-    allAccounts: filteredAccounts,
+    allAccounts: sortedAccounts,
     loading: isLoadingAccounts,
     formLoading,
     searchTerm,
@@ -165,12 +189,15 @@ export const useAccounts = () => {
     startIndex,
     endIndex,
     formData,
-    
+    sortKey,
+    sortDirection,
     // Actions
     setSearchTerm,
     setIndustryFilter,
     setCurrentPage,
     setFormData,
+    setSortKey,
+    setSortDirection,
     handleCreateAccount,
     handleEditAccount,
     handleDeleteAccount,

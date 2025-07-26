@@ -302,6 +302,15 @@ export function useFinance() {
     return response.data;
   }, [apiClient]);
 
+  // Load data on mount and when company_id changes
+  useEffect(() => {
+    if (user?.company_id) {
+      fetchAccounts();
+      fetchCategories();
+      fetchBudgets();
+    }
+  }, [user?.company_id, fetchAccounts, fetchCategories, fetchBudgets]);
+
   return {
     // Account functions
     accounts,

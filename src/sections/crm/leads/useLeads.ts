@@ -39,6 +39,8 @@ export const useLeads = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [formLoading, setFormLoading] = useState(false);
+  const [sortKey, setSortKey] = useState<string>("created_at"); // default to created_at if available
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -213,11 +215,33 @@ export const useLeads = () => {
     (lead.title && lead.title.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Sorting logic
+  const sortedLeads = [...filteredLeads].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    // If sorting by name/email/company/title, compare as strings
+    if (["name", "email", "company", "title", "status"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    // If sorting by created_at or other date, compare as dates
+    if (sortKey === "created_at" && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    // Default fallback
+    return 0;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedLeads.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
+  const paginatedLeads = sortedLeads.slice(startIndex, endIndex);
 
   // Reset to first page when search or filter changes
   useEffect(() => {
@@ -227,7 +251,7 @@ export const useLeads = () => {
   return {
     // State
     leads: paginatedLeads,
-    allLeads: filteredLeads,
+    allLeads: sortedLeads,
     loading: isLoadingLeads,
     formLoading,
     searchTerm,
@@ -246,13 +270,16 @@ export const useLeads = () => {
     isLoadingAccounts,
     contacts,
     isLoadingContacts,
-    
+    sortKey,
+    sortDirection,
     // Actions
     setSearchTerm,
     setStatusFilter,
     setCategoryFilter,
     setCurrentPage,
     setFormData,
+    setSortKey,
+    setSortDirection,
     handleCreateLead,
     handleEditLead,
     handleDeleteLead,

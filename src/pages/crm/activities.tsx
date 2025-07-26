@@ -26,10 +26,14 @@ import {
   Edit,
   Trash2,
   Loader2,
-  MapPin
+  MapPin,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
+import { ActivityForm } from "@/sections/crm/activities/ActivityForm";
 
 export default function Activities() {
+  console.log('Activities render');
   const { toast } = useToast();
   const {
     activities,
@@ -50,6 +54,10 @@ export default function Activities() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<string>("due_date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // Activity state
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = useState(false);
@@ -74,11 +82,60 @@ export default function Activities() {
     assigned_to: ""
   });
 
+  // Dialog open/close handlers (pattern from AccountForm)
+  const handleCreateDialogOpen = (open: boolean) => {
+    setIsCreateActivityDialogOpen(open);
+  };
+
+  const handleEditDialogOpen = (open: boolean) => {
+    setIsEditActivityDialogOpen(open);
+    if (!open) {
+      setEditingActivity(null);
+      setActivityFormData({
+        type: "call",
+        title: "",
+        description: "",
+        priority: "medium",
+        due_date: "",
+        start_time: "",
+        end_time: "",
+        location: "",
+        lead_id: "",
+        contact_id: "",
+        account_id: "",
+        opportunity_id: "",
+        assigned_to: ""
+      });
+    }
+  };
+
+  // Reset form data only when the create dialog is first opened
+  useEffect(() => {
+    if (isCreateActivityDialogOpen) {
+      setActivityFormData({
+        type: "call",
+        title: "",
+        description: "",
+        priority: "medium",
+        due_date: "",
+        start_time: "",
+        end_time: "",
+        location: "",
+        lead_id: "",
+        contact_id: "",
+        account_id: "",
+        opportunity_id: "",
+        assigned_to: ""
+      });
+    }
+  }, [isCreateActivityDialogOpen]);
+
   // Refresh activities when type filter changes
   useEffect(() => {
     const params = typeFilter !== "all" ? { type: typeFilter } : {};
     fetchActivities(params);
-  }, [typeFilter, fetchActivities]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeFilter]);
 
   // Activity CRUD operations
   const handleCreateActivity = async (e: React.FormEvent) => {
@@ -101,22 +158,7 @@ export default function Activities() {
       };
 
       await createActivity(cleanData);
-      setIsCreateActivityDialogOpen(false);
-      setActivityFormData({
-        type: "call",
-        title: "",
-        description: "",
-        priority: "medium",
-        due_date: "",
-        start_time: "",
-        end_time: "",
-        location: "",
-        lead_id: "",
-        contact_id: "",
-        account_id: "",
-        opportunity_id: "",
-        assigned_to: ""
-      });
+      handleCreateDialogOpen(false);
       toast({
         title: "Success",
         description: "Activity created successfully",
@@ -157,7 +199,7 @@ export default function Activities() {
       };
 
       await updateActivity(editingActivity.id, cleanData);
-      setIsEditActivityDialogOpen(false);
+      handleEditDialogOpen(false);
       setEditingActivity(null);
       toast({
         title: "Success",
@@ -232,7 +274,7 @@ export default function Activities() {
       end_time: activity.end_time || "",
       location: activity.location || ""
     });
-    setIsEditActivityDialogOpen(true);
+    handleEditDialogOpen(true);
   };
 
   const getActivityIcon = (type: string) => {
@@ -291,6 +333,39 @@ export default function Activities() {
     return matchesSearch && matchesPriority;
   });
 
+  // Sorting logic
+  const sortedActivities = [...filteredActivities].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    // If sorting by title or priority, compare as strings
+    if (["title", "priority"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    // If sorting by due_date or created_at, compare as dates
+    if (["due_date", "created_at"].includes(sortKey) && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    // Default fallback
+    return 0;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedActivities.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedActivities = sortedActivities.slice(startIndex, endIndex);
+
+  // Reset to first page when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, priorityFilter, sortKey, sortDirection]);
+
   // Show loading state
   if (isLoadingActivities) {
     return (
@@ -317,214 +392,6 @@ export default function Activities() {
     );
   }
 
-  const ActivityForm = ({ onSubmit, isEdit = false }: { onSubmit: (e: React.FormEvent) => void; isEdit?: boolean }) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="type">Activity Type *</Label>
-          <Select 
-            value={activityFormData.type} 
-            onValueChange={(value) => setActivityFormData(prev => ({ ...prev, type: value as "call" | "email" | "meeting" | "task" }))}
-            required
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="call">Call</SelectItem>
-              <SelectItem value="email">Email</SelectItem>
-              <SelectItem value="meeting">Meeting</SelectItem>
-              <SelectItem value="task">Task</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="priority">Priority</Label>
-          <Select 
-            value={activityFormData.priority} 
-            onValueChange={(value) => setActivityFormData(prev => ({ ...prev, priority: value as "low" | "medium" | "high" }))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="title">Title *</Label>
-        <Input
-          id="title"
-          value={activityFormData.title}
-          onChange={(e) => setActivityFormData(prev => ({ ...prev, title: e.target.value }))}
-          required
-          placeholder="e.g., Follow-up call with client"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={activityFormData.description}
-          onChange={(e) => setActivityFormData(prev => ({ ...prev, description: e.target.value }))}
-          placeholder="Activity details..."
-          rows={3}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="due_date">Due Date *</Label>
-          <Input
-            id="due_date"
-            type="date"
-            value={activityFormData.due_date}
-            onChange={(e) => setActivityFormData(prev => ({ ...prev, due_date: e.target.value }))}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="location">Location</Label>
-          <Input
-            id="location"
-            value={activityFormData.location}
-            onChange={(e) => setActivityFormData(prev => ({ ...prev, location: e.target.value }))}
-            placeholder="e.g., Conference Room A"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="start_time">Start Time</Label>
-          <Input
-            id="start_time"
-            type="datetime-local"
-            value={activityFormData.start_time}
-            onChange={(e) => setActivityFormData(prev => ({ ...prev, start_time: e.target.value }))}
-          />
-        </div>
-        <div>
-          <Label htmlFor="end_time">End Time</Label>
-          <Input
-            id="end_time"
-            type="datetime-local"
-            value={activityFormData.end_time}
-            onChange={(e) => setActivityFormData(prev => ({ ...prev, end_time: e.target.value }))}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="lead_id">Related Lead</Label>
-          <Select 
-            value={activityFormData.lead_id || "none"} 
-            onValueChange={(value) => setActivityFormData(prev => ({ ...prev, lead_id: value === "none" ? "" : value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select lead" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Lead</SelectItem>
-              {leads.map(lead => (
-                <SelectItem key={lead.id} value={lead.id}>
-                  {lead.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="contact_id">Related Contact</Label>
-          <Select 
-            value={activityFormData.contact_id || "none"} 
-            onValueChange={(value) => setActivityFormData(prev => ({ ...prev, contact_id: value === "none" ? "" : value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select contact" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Contact</SelectItem>
-              {contacts.map(contact => (
-                <SelectItem key={contact.id} value={contact.id}>
-                  {contact.first_name} {contact.last_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="account_id">Related Account</Label>
-          <Select 
-            value={activityFormData.account_id || "none"} 
-            onValueChange={(value) => setActivityFormData(prev => ({ ...prev, account_id: value === "none" ? "" : value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select account" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Account</SelectItem>
-              {accounts.map(account => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="opportunity_id">Related Opportunity</Label>
-          <Select 
-            value={activityFormData.opportunity_id || "none"} 
-            onValueChange={(value) => setActivityFormData(prev => ({ ...prev, opportunity_id: value === "none" ? "" : value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select opportunity" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Opportunity</SelectItem>
-              {opportunities.map(opportunity => (
-                <SelectItem key={opportunity.id} value={opportunity.id}>
-                  {opportunity.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={() => {
-            if (isEdit) {
-              setIsEditActivityDialogOpen(false);
-            } else {
-              setIsCreateActivityDialogOpen(false);
-            }
-          }}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={activityFormLoading}>
-          {activityFormLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {isEdit ? "Update Activity" : "Create Activity"}
-        </Button>
-      </div>
-    </form>
-  );
-
   return (
     <ExtensibleLayout moduleSidebar={crmSidebarSections} moduleTitle="Customer Relationship Management" >
       <div className="space-y-6">
@@ -538,7 +405,7 @@ export default function Activities() {
           </div>
           
           <div>
-            <Dialog open={isCreateActivityDialogOpen} onOpenChange={setIsCreateActivityDialogOpen}>
+            <Dialog open={isCreateActivityDialogOpen} onOpenChange={handleCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
@@ -549,7 +416,35 @@ export default function Activities() {
                 <DialogHeader>
                   <DialogTitle>Create New Activity</DialogTitle>
                 </DialogHeader>
-                <ActivityForm onSubmit={handleCreateActivity} />
+                <ActivityForm 
+                  onSubmit={handleCreateActivity} 
+                  isEdit={false} 
+                  activityFormData={activityFormData} 
+                  setActivityFormData={setActivityFormData} 
+                  activityFormLoading={activityFormLoading} 
+                  setActivityFormLoading={setActivityFormLoading} 
+                  leads={leads} 
+                  contacts={contacts} 
+                  accounts={accounts} 
+                  opportunities={opportunities} 
+                  handleEditDialogOpen={handleEditDialogOpen} 
+                  setEditingActivity={setEditingActivity} 
+                  editingActivity={editingActivity} 
+                  toast={toast} 
+                  fetchActivities={fetchActivities} 
+                  createActivity={createActivity} 
+                  updateActivity={updateActivity} 
+                  deleteActivity={deleteActivity} 
+                  markActivityAsCompleted={markActivityAsCompleted} 
+                  openEditActivityDialog={openEditActivityDialog} 
+                  getActivityIcon={getActivityIcon} 
+                  getStatusColor={getStatusColor} 
+                  getPriorityColor={getPriorityColor} 
+                  getContactName={getContactName} 
+                  getOpportunityName={getOpportunityName} 
+                  getLeadName={getLeadName} 
+                  getAccountName={getAccountName} 
+                />
               </DialogContent>
             </Dialog>
           </div>
@@ -588,9 +483,30 @@ export default function Activities() {
               <SelectItem value="low">Low</SelectItem>
             </SelectContent>
           </Select>
+         {/* Sort Dropdown */}
+         <Select value={sortKey} onValueChange={setSortKey}>
+           <SelectTrigger className="w-40">
+             <SelectValue />
+           </SelectTrigger>
+           <SelectContent>
+             <SelectItem value="due_date">Sort by Due Date</SelectItem>
+             <SelectItem value="title">Sort by Title</SelectItem>
+             <SelectItem value="priority">Sort by Priority</SelectItem>
+             <SelectItem value="created_at">Sort by Created Date</SelectItem>
+           </SelectContent>
+         </Select>
+         <Button
+           type="button"
+           variant="outline"
+           className="w-10 flex items-center justify-center"
+           onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+           aria-label={sortDirection === "asc" ? "Sort ascending" : "Sort descending"}
+         >
+           {sortDirection === "asc" ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+         </Button>
         </div>
 
-        {filteredActivities.length === 0 ? (
+        {paginatedActivities.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Calendar className="h-12 w-12 text-gray-400 mb-4" />
@@ -605,98 +521,194 @@ export default function Activities() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {filteredActivities.map((activity) => (
-              <Card key={activity.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          {getActivityIcon(activity.type)}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">{activity.title}</h3>
-                          <p className="text-gray-600 capitalize">{activity.type}</p>
-                        </div>
+            {paginatedActivities.map((activity) => {
+              // Get related data
+              const contact = contacts.find(c => c.id === activity.contact_id);
+              const account = accounts.find(a => a.id === activity.account_id);
+              const opportunity = opportunities.find(o => o.id === activity.opportunity_id);
+              // Gradient backgrounds for icon
+              const typeGradient =
+                activity.type === 'call' ? 'bg-gradient-to-br from-blue-400 to-blue-600 text-white' :
+                activity.type === 'email' ? 'bg-gradient-to-br from-green-400 to-green-600 text-white' :
+                activity.type === 'meeting' ? 'bg-gradient-to-br from-purple-400 to-purple-600 text-white' :
+                activity.type === 'task' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white' :
+                'bg-gradient-to-br from-gray-300 to-gray-500 text-white';
+              // Status dot color
+              const statusDotColor =
+                activity.status === 'completed' ? 'bg-green-500' :
+                activity.status === 'overdue' ? 'bg-red-500' :
+                'bg-blue-200';
+              // Avatar for contact (initials fallback, no avatar_url field in Contact type)
+              const contactAvatar = contact
+                ? <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-sm">{contact.first_name?.[0]}{contact.last_name?.[0]}</div>
+                : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400"><User className="w-4 h-4" /></div>;
+              return (
+                <Card
+                  key={activity.id}
+                  className="relative group transition-all border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl hover:scale-[1.015] bg-white overflow-hidden duration-200"
+                >
+                  {/* Status dot in top-left */}
+                  <div className="absolute left-4 top-4 z-20">
+                    <span className={`inline-block w-3 h-3 rounded-full border-2 border-white shadow ${statusDotColor}`} />
+                  </div>
+                  <CardContent className="flex flex-col md:flex-row items-stretch gap-4 p-5 min-h-0">
+                    {/* Left: Icon and Type */}
+                    <div className="flex flex-col items-center justify-center mr-2 min-w-[48px]">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-1 shadow-md ${typeGradient} transition-transform group-hover:scale-110 border-2 border-white`}>
+                        {getActivityIcon(activity.type)}
                       </div>
-                      
+                      <span className="text-xs font-semibold capitalize text-gray-500 mt-1 tracking-wide">{activity.type}</span>
+                    </div>
+
+                    {/* Center: Main Info */}
+                    <div className="flex-1 flex flex-col gap-1 justify-center min-w-0">
+                      <div className="flex items-center gap-2 mb-1 min-w-0">
+                        <h3 className="font-bold text-lg text-gray-900 truncate leading-tight" title={activity.title}>{activity.title}</h3>
+                        {activity.status === 'overdue' && (
+                          <span className="ml-1 px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs font-semibold animate-pulse">Overdue</span>
+                        )}
+                        {account && (
+                          <span className="ml-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100 truncate max-w-[100px]" title={account.name}>{account.name}</span>
+                        )}
+                      </div>
                       {activity.description && (
-                        <p className="text-gray-700 mb-4">{activity.description}</p>
+                        <p className="text-gray-500 text-sm mb-0 line-clamp-2 leading-tight">{activity.description}</p>
                       )}
-                      
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">{new Date(activity.due_date).toLocaleDateString()}</span>
+                      {/* Meta info pill group */}
+                      <div className="flex flex-wrap gap-1 text-xs mt-1">
+                        <div className="flex items-center gap-1 bg-gray-50 rounded-full px-2 py-0.5 font-semibold text-gray-800">
+                          <Clock className="h-4 w-4 text-gray-400" aria-label="Due date" />
+                          <span>{new Date(activity.due_date).toLocaleDateString()}</span>
                         </div>
                         {activity.location && (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm">{activity.location}</span>
+                          <div className="flex items-center gap-1 bg-gray-50 rounded-full px-2 py-0.5">
+                            <MapPin className="h-4 w-4 text-gray-400" aria-label="Location" />
+                            <span>{activity.location}</span>
                           </div>
                         )}
-                        {activity.contact_id && (
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm">{getContactName(activity.contact_id)}</span>
+                        {contact && (
+                          <div className="flex items-center gap-1 bg-gray-50 rounded-full px-2 py-0.5">
+                            {contactAvatar}
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-bold text-xs text-gray-900">{contact.first_name} {contact.last_name}</span>
+                              {(contact.email || contact.phone) && (
+                                <span className="font-semibold text-xs text-gray-800">
+                                  {contact.email}{contact.email && contact.phone ? ' • ' : ''}{contact.phone}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
-                        {activity.opportunity_id && (
-                          <div className="flex items-center gap-2">
-                            <Building className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm">{getOpportunityName(activity.opportunity_id)}</span>
+                        {opportunity && (
+                          <div className="flex items-center gap-1 bg-gray-50 rounded-full px-2 py-0.5 font-semibold text-gray-800">
+                            <Building className="h-4 w-4 text-gray-400" aria-label="Opportunity" />
+                            <span title={opportunity.name}>{opportunity.name}</span>
                           </div>
                         )}
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex gap-2">
-                        <Badge className={getStatusColor(activity.status || "pending")}>
-                          {(activity.status || "pending").toUpperCase()}
-                        </Badge>
-                        <Badge className={getPriorityColor(activity.priority)}>
-                          {activity.priority.toUpperCase()}
-                        </Badge>
+
+                    {/* Right: Status, Priority, Actions */}
+                    <div className="flex flex-col items-end justify-between min-w-[70px] gap-2">
+                      <div className="flex gap-1 mb-1">
+                        <Badge className={`rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm ${getStatusColor(activity.status || 'pending')}`}>{(activity.status || 'pending').toUpperCase()}</Badge>
+                        <Badge className={`rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm ${getPriorityColor(activity.priority)}`}>{activity.priority.toUpperCase()}</Badge>
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex flex-col gap-1">
                         {activity.status !== "completed" && (
                           <Button 
-                            size="sm" 
-                            variant="outline" 
+                            size="icon" 
+                            variant="ghost" 
                             onClick={() => handleCompleteActivity(activity.id)}
-                            className="text-green-600 hover:text-green-700"
+                            className="text-green-600 hover:bg-green-50 transition-colors"
+                            title="Mark as completed"
+                            aria-label="Mark as completed"
                           >
-                            <CheckCircle className="h-3 w-3" />
+                            <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" onClick={() => openEditActivityDialog(activity)}>
-                          <Edit className="h-3 w-3" />
+                        <Button size="icon" variant="ghost" onClick={() => openEditActivityDialog(activity)} title="Edit" aria-label="Edit">
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button 
-                          size="sm" 
-                          variant="outline" 
+                          size="icon" 
+                          variant="ghost" 
                           onClick={() => handleDeleteActivity(activity.id)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete"
+                          aria-label="Delete"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </Button>
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
           </div>
         )}
 
         {/* Edit Activity Dialog */}
-        <Dialog open={isEditActivityDialogOpen} onOpenChange={setIsEditActivityDialogOpen}>
+        <Dialog open={isEditActivityDialogOpen} onOpenChange={handleEditDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Activity</DialogTitle>
             </DialogHeader>
-            <ActivityForm onSubmit={handleEditActivity} isEdit={true} />
+            <ActivityForm 
+              onSubmit={handleEditActivity} 
+              isEdit={true} 
+              activityFormData={activityFormData} 
+              setActivityFormData={setActivityFormData} 
+              activityFormLoading={activityFormLoading} 
+              setActivityFormLoading={setActivityFormLoading} 
+              leads={leads} 
+              contacts={contacts} 
+              accounts={accounts} 
+              opportunities={opportunities} 
+              handleEditDialogOpen={handleEditDialogOpen} 
+              setEditingActivity={setEditingActivity} 
+              editingActivity={editingActivity} 
+              toast={toast} 
+              fetchActivities={fetchActivities} 
+              createActivity={createActivity} 
+              updateActivity={updateActivity} 
+              deleteActivity={deleteActivity} 
+              markActivityAsCompleted={markActivityAsCompleted} 
+              openEditActivityDialog={openEditActivityDialog} 
+              getActivityIcon={getActivityIcon} 
+              getStatusColor={getStatusColor} 
+              getPriorityColor={getPriorityColor} 
+              getContactName={getContactName} 
+              getOpportunityName={getOpportunityName} 
+              getLeadName={getLeadName} 
+              getAccountName={getAccountName} 
+            />
           </DialogContent>
         </Dialog>
       </div>

@@ -35,19 +35,24 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/apis";
+import { ProjectsService } from "@/apis/services/projects.service";
+import { UserService } from "@/apis/services/user.service";
+import { apiClient } from "@/apis/core/client";
 import type { 
   Project, 
   ProjectSprint, 
   ProjectTask,
-  CreateSprintData,
-  UpdateSprintData,
+  CreateProjectSprintData,
+  UpdateProjectSprintData,
   User
 } from "@/apis/types";
 
 export default function SprintsBacklog() {
-  const { user, companyId } = useAuth();
+  const { user, isHydrated } = useAuth();
   const { toast } = useToast();
+
+  const projectsService = new ProjectsService(apiClient);
+  const userService = new UserService(apiClient);
 
   // State management
   const [loading, setLoading] = useState(true);
@@ -67,31 +72,33 @@ export default function SprintsBacklog() {
   const [users, setUsers] = useState<User[]>([]);
 
   // Form state
-  const [sprintForm, setSprintForm] = useState({
+  const [sprintForm, setSprintForm] = useState<Partial<CreateProjectSprintData>>({
     project_id: '',
     name: '',
     goal: '',
     start_date: '',
     end_date: '',
-    owner_id: ''
+    status: 'planning',
+    capacity: 40
   });
 
   // Load data on component mount
   useEffect(() => {
-    const loadSprintsData = async () => {
-      if (!companyId) return;
+    if (!isHydrated) return;
+    if (!user?.company_id) return;
+    if (!apiClient.getAuthToken()) return;
 
+    const loadSprintsData = async () => {
       setLoading(true);
       setError(null);
-
       try {
         // Parallel API calls for optimal performance
         const [
           projectsData,
           usersData
         ] = await Promise.all([
-          api.projects.getProjects({ limit: 100 }),
-          api.user.getCompanyUsers(companyId, { limit: 100 })
+          projectsService.getProjects({ limit: 100 }),
+          userService.getCompanyUsers(user.company_id, { limit: 100 })
         ]);
 
         console.log("🏃‍♂️ Sprints data loaded:", { 
@@ -106,47 +113,37 @@ export default function SprintsBacklog() {
         // Load sprints and tasks for active projects
         if (projectsList.length > 0) {
           const activeProjects = projectsList.filter(p => p.status === 'in_progress');
-          
           const [sprintsData, tasksData] = await Promise.all([
-            // Get sprints for active projects
             Promise.all(
               activeProjects.map(project => 
-                api.projects.getProjectSprints(project.id).catch(() => [])
+                projectsService.getProjectSprints(project.id).catch(() => [])
               )
             ),
-            // Get tasks for active projects
             Promise.all(
               activeProjects.map(project => 
-                api.projects.getProjectTasks(project.id).catch(() => [])
+                projectsService.getProjectTasks(project.id).then(r => r.data || []).catch(() => [])
               )
             )
           ]);
-
           const allSprints = sprintsData.flat();
           const allTasks = tasksData.flat();
-          
           setSprints(allSprints);
-          
           // Categorize sprints
           const now = new Date();
           const active = allSprints.filter(sprint => 
             new Date(sprint.start_date) <= now && new Date(sprint.end_date) >= now
           );
           const completed = allSprints.filter(sprint => new Date(sprint.end_date) < now);
-          
           setActiveSprints(active);
           setCompletedSprints(completed);
-          
           // Get backlog tasks (tasks not assigned to any sprint)
           const backlog = allTasks.filter(task => !task.sprint_id);
           setBacklogTasks(backlog);
         }
-
         toast({
           title: "Sprints loaded",
           description: `Found ${projectsList.length} projects with sprint data`,
         });
-
       } catch (err) {
         console.error("Failed to load sprints data:", err);
         setError("Failed to load sprints data. Please try again.");
@@ -159,9 +156,8 @@ export default function SprintsBacklog() {
         setLoading(false);
       }
     };
-
     loadSprintsData();
-  }, [companyId, toast]);
+  }, [isHydrated, user?.company_id, apiClient.getAuthToken(), toast]);
 
   const handleCreateSprint = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,13 +165,14 @@ export default function SprintsBacklog() {
 
     setSubmitting(true);
     try {
-      const newSprint = await api.projects.createSprint({
-        project_id: sprintForm.project_id,
-        name: sprintForm.name,
-        goal: sprintForm.goal,
-        start_date: sprintForm.start_date,
-        end_date: sprintForm.end_date,
-        owner_id: sprintForm.owner_id || user?.id || ''
+      const newSprint = await projectsService.createSprint({
+        project_id: sprintForm.project_id!, // required
+        name: sprintForm.name!, // required
+        goal: sprintForm.goal || '',
+        start_date: sprintForm.start_date!,
+        end_date: sprintForm.end_date!,
+        status: 'planning',
+        capacity: 40
       });
 
       setSprints([...sprints, newSprint]);
@@ -212,13 +209,15 @@ export default function SprintsBacklog() {
 
     setSubmitting(true);
     try {
-      const updatedSprint = await api.projects.updateSprint(selectedSprint.id, {
-        name: sprintForm.name,
+      const updateData: UpdateProjectSprintData = {
+        name: sprintForm.name!,
         goal: sprintForm.goal,
-        start_date: sprintForm.start_date,
-        end_date: sprintForm.end_date,
-        owner_id: sprintForm.owner_id
-      });
+        start_date: sprintForm.start_date!,
+        end_date: sprintForm.end_date!,
+        status: selectedSprint.status,
+        capacity: selectedSprint.capacity
+      };
+      const updatedSprint = await projectsService.updateSprint(selectedSprint.id, updateData);
 
       setSprints(sprints.map(s => s.id === selectedSprint.id ? updatedSprint : s));
       
@@ -253,7 +252,7 @@ export default function SprintsBacklog() {
     if (!confirm("Are you sure you want to delete this sprint?")) return;
 
     try {
-      await api.projects.deleteSprint(sprintId);
+      await projectsService.deleteSprint(sprintId);
       
       setSprints(sprints.filter(s => s.id !== sprintId));
       setActiveSprints(activeSprints.filter(s => s.id !== sprintId));
@@ -282,7 +281,8 @@ export default function SprintsBacklog() {
       goal: sprint.goal || '',
       start_date: sprint.start_date ? sprint.start_date.split('T')[0] : '', // Format for date input with null check
       end_date: sprint.end_date ? sprint.end_date.split('T')[0] : '', // Format for date input with null check
-      owner_id: sprint.owner_id
+      status: sprint.status,
+      capacity: sprint.capacity
     });
     setIsEditSprintOpen(true);
   };
@@ -294,7 +294,8 @@ export default function SprintsBacklog() {
       goal: '',
       start_date: '',
       end_date: '',
-      owner_id: user?.id || ''
+      status: 'planning',
+      capacity: 40
     });
   };
 
@@ -451,25 +452,6 @@ export default function SprintsBacklog() {
                         required
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="owner">Sprint Owner</Label>
-                    <Select 
-                      value={sprintForm.owner_id} 
-                      onValueChange={(value) => setSprintForm({...sprintForm, owner_id: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select owner" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="flex justify-end space-x-2 pt-4">
@@ -708,12 +690,6 @@ export default function SprintsBacklog() {
                                   Due: {new Date(task.due_date).toLocaleDateString()}
                                 </div>
                               )}
-                              {task.estimated_hours && (
-                                <div className="flex items-center">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  {task.estimated_hours}h estimated
-                                </div>
-                              )}
                             </div>
                           </div>
                           <div className="flex space-x-2 ml-4">
@@ -853,25 +829,6 @@ export default function SprintsBacklog() {
                     required
                   />
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="edit_owner">Sprint Owner</Label>
-                <Select 
-                  value={sprintForm.owner_id} 
-                  onValueChange={(value) => setSprintForm({...sprintForm, owner_id: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select owner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">

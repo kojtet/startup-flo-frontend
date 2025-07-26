@@ -21,7 +21,9 @@ import {
   Trash2,
   Loader2,
   Calendar,
-  Download
+  Download,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 
 export default function Notes() {
@@ -44,6 +46,10 @@ export default function Notes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<string>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // Note state
   const [isCreateNoteDialogOpen, setIsCreateNoteDialogOpen] = useState(false);
@@ -238,6 +244,39 @@ export default function Notes() {
     const matchesEntityType = entityTypeFilter === "all" || note.entity_type === entityTypeFilter;
     return matchesSearch && matchesEntityType;
   });
+
+  // Sorting logic
+  const sortedNotes = [...filteredNotes].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    // If sorting by content, type, or file_name, compare as strings
+    if (["content", "type", "file_name"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    // If sorting by created_at, compare as dates
+    if (sortKey === "created_at" && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    // Default fallback
+    return 0;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedNotes.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedNotes = sortedNotes.slice(startIndex, endIndex);
+
+  // Reset to first page when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, entityTypeFilter, sortKey, sortDirection]);
 
   // Show loading state
   if (isLoadingNotes) {
@@ -471,9 +510,30 @@ export default function Notes() {
               <SelectItem value="account">Accounts</SelectItem>
             </SelectContent>
           </Select>
+         {/* Sort Dropdown */}
+         <Select value={sortKey} onValueChange={setSortKey}>
+           <SelectTrigger className="w-40">
+             <SelectValue />
+           </SelectTrigger>
+           <SelectContent>
+             <SelectItem value="created_at">Sort by Created Date</SelectItem>
+             <SelectItem value="content">Sort by Content</SelectItem>
+             <SelectItem value="type">Sort by Type</SelectItem>
+             <SelectItem value="file_name">Sort by File Name</SelectItem>
+           </SelectContent>
+         </Select>
+         <Button
+           type="button"
+           variant="outline"
+           className="w-10 flex items-center justify-center"
+           onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+           aria-label={sortDirection === "asc" ? "Sort ascending" : "Sort descending"}
+         >
+           {sortDirection === "asc" ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+         </Button>
         </div>
 
-        {filteredNotes.length === 0 ? (
+        {paginatedNotes.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="h-12 w-12 text-gray-400 mb-4" />
@@ -488,7 +548,7 @@ export default function Notes() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {filteredNotes.map((note) => (
+            {paginatedNotes.map((note) => (
               <Card key={note.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -565,6 +625,31 @@ export default function Notes() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </Button>
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
           </div>
         )}
 

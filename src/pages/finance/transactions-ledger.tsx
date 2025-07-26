@@ -5,7 +5,7 @@ import { TransactionsSection } from '@/sections/finance/transactions';
 
 export default function TransactionsLedgerPage() {
   return (
-    <ExtensibleLayout sidebarSections={financeSidebarSections}>
+    <ExtensibleLayout moduleSidebar={financeSidebarSections} moduleTitle="Finance & Accounting">
       <div className="container mx-auto py-6">
         <TransactionsSection />
       </div>

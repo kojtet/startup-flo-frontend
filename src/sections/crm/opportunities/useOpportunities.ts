@@ -22,6 +22,8 @@ export const useOpportunities = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [formLoading, setFormLoading] = useState(false);
+  const [sortKey, setSortKey] = useState<string>("created_at"); // default to created_at if available
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -176,11 +178,37 @@ export const useOpportunities = () => {
     return matchesSearch && matchesStage;
   });
 
+  // Sorting logic
+  const sortedOpportunities = [...filteredOpportunities].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    // If sorting by name, compare as strings
+    if (["name"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    // If sorting by amount, compare as numbers
+    if (sortKey === "amount") {
+      return sortDirection === "asc" ? (aValue - bValue) : (bValue - aValue);
+    }
+    // If sorting by expected_close or created_at, compare as dates
+    if (["expected_close", "created_at"].includes(sortKey) && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    // Default fallback
+    return 0;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredOpportunities.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedOpportunities.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedOpportunities = filteredOpportunities.slice(startIndex, endIndex);
+  const paginatedOpportunities = sortedOpportunities.slice(startIndex, endIndex);
 
   // Reset to first page when search or filters change
   useEffect(() => {
@@ -190,7 +218,7 @@ export const useOpportunities = () => {
   return {
     // State
     opportunities: paginatedOpportunities,
-    allOpportunities: filteredOpportunities,
+    allOpportunities: sortedOpportunities,
     loading: isLoadingOpportunities,
     formLoading,
     searchTerm,
@@ -203,12 +231,15 @@ export const useOpportunities = () => {
     accounts: apiAccounts,
     contacts: apiContacts,
     stages: apiStages,
-    
+    sortKey,
+    sortDirection,
     // Actions
     setSearchTerm,
     setStageFilter,
     setCurrentPage,
     setFormData,
+    setSortKey,
+    setSortDirection,
     handleCreateOpportunity,
     handleEditOpportunity,
     handleDeleteOpportunity,

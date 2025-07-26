@@ -33,6 +33,10 @@ export default function AccountsPage() {
     handleEditAccount,
     handleDeleteAccount,
     resetFormData,
+    sortKey,
+    setSortKey,
+    sortDirection,
+    setSortDirection,
   } = useAccounts();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -131,6 +135,10 @@ export default function AccountsPage() {
           industryFilter={industryFilter}
           setIndustryFilter={setIndustryFilter}
           accounts={allAccounts}
+          sortKey={sortKey}
+          setSortKey={setSortKey}
+          sortDirection={sortDirection}
+          setSortDirection={setSortDirection}
         />
 
         {loading ? (

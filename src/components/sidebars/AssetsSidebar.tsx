@@ -12,6 +12,7 @@ export const assetsSidebarSections: SidebarSection[] = [
   {
     title: "Asset Management",
     items: [
+      { label: "Overview", href: "/assets", icon: Archive },
       { label: "Asset Register", href: "/assets/register", icon: Archive },
       { label: "Assignments", href: "/assets/assignments", icon: Clipboard },
       { label: "Categories", href: "/assets/categories", icon: Tags },

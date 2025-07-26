@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/apis';
 import type { Asset, CreateAssetData, UpdateAssetData, AssetCategory } from '@/apis/types';
 import { 
   Archive, 
@@ -24,7 +23,9 @@ import {
   Calendar,
   DollarSign,
   Tag,
-  MapPin
+  MapPin,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import {
   Dialog,
@@ -54,7 +55,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function AssetRegisterPage() {
-  const { user } = useAuth();
+  const { user, apiClient } = useAuth() as any;
   const { toast } = useToast();
 
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -63,6 +64,8 @@ export default function AssetRegisterPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [sortKey, setSortKey] = useState<string>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -76,19 +79,33 @@ export default function AssetRegisterPage() {
     purchase_cost: 0,
     status: 'in_stock',
     location: '',
-    description: '',
-    warranty_expiry: '',
-    depreciation_method: 'straight_line',
-    useful_life_years: 5,
+    notes: '',
     asset_tag: '',
     depreciation_start: ''
   });
 
   useEffect(() => {
-    fetchData();
-  }, [statusFilter, categoryFilter]);
+    if (user?.company_id) {
+      fetchData();
+    }
+  }, [user?.company_id, statusFilter, categoryFilter]);
+
+  // Reset to first page when search or filters change
+  useEffect(() => {
+    // This effect will run when search or filters change
+    // In a real implementation, you might want to reset pagination here
+  }, [searchTerm, statusFilter, categoryFilter]);
 
   const fetchData = async () => {
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -97,12 +114,12 @@ export default function AssetRegisterPage() {
       if (categoryFilter !== 'all') params.category_id = categoryFilter;
       
       const [assetsResponse, categoriesResponse] = await Promise.all([
-        api.assets.getAssets(params),
-        api.assets.getAssetCategories()
+        apiClient.get('/assets/assets', { params }),
+        apiClient.get('/assets/categories')
       ]);
 
-      setAssets(assetsResponse || []);
-      setCategories(categoriesResponse || []);
+      setAssets(assetsResponse.data || []);
+      setCategories(categoriesResponse.data || []);
     } catch (error) {
       toast({
         title: "Error",
@@ -116,20 +133,31 @@ export default function AssetRegisterPage() {
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setFormLoading(true);
-      const newAsset = await api.assets.createAsset(formData);
-      setAssets(prev => [newAsset, ...prev]);
+      const response = await apiClient.post('/assets/assets', formData);
+      setAssets(prev => [response.data, ...prev]);
       setIsCreateDialogOpen(false);
       resetForm();
       toast({
         title: "Success",
         description: "Asset created successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error creating asset:', error);
       toast({
         title: "Error",
-        description: "Failed to create asset",
+        description: error.response?.data?.message || "Failed to create asset",
         variant: "destructive"
       });
     } finally {
@@ -141,23 +169,31 @@ export default function AssetRegisterPage() {
     e.preventDefault();
     if (!selectedAsset) return;
 
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setFormLoading(true);
       const updateData: UpdateAssetData = {
         asset_tag: formData.asset_tag,
         name: formData.name,
-        description: formData.description,
         category_id: formData.category_id,
         status: formData.status,
         purchase_date: formData.purchase_date,
         purchase_cost: formData.purchase_cost,
         serial_number: formData.serial_number,
-        notes: formData.description
+        notes: formData.notes
       };
 
-      const updatedAsset = await api.assets.updateAsset(selectedAsset.id, updateData);
+      const response = await apiClient.patch(`/assets/assets/${selectedAsset.id}`, updateData);
       setAssets(prev => prev.map(asset => 
-        asset.id === selectedAsset.id ? updatedAsset : asset
+        asset.id === selectedAsset.id ? response.data : asset
       ));
       setIsEditDialogOpen(false);
       setSelectedAsset(null);
@@ -165,10 +201,11 @@ export default function AssetRegisterPage() {
         title: "Success",
         description: "Asset updated successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating asset:', error);
       toast({
         title: "Error",
-        description: "Failed to update asset",
+        description: error.response?.data?.message || "Failed to update asset",
         variant: "destructive"
       });
     } finally {
@@ -179,17 +216,27 @@ export default function AssetRegisterPage() {
   const handleDeleteAsset = async (assetId: string) => {
     if (!confirm('Are you sure you want to delete this asset?')) return;
 
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      await api.assets.deleteAsset(assetId);
+      await apiClient.delete(`/assets/assets/${assetId}`);
       setAssets(prev => prev.filter(asset => asset.id !== assetId));
       toast({
         title: "Success",
         description: "Asset deleted successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error deleting asset:', error);
       toast({
         title: "Error",
-        description: "Failed to delete asset",
+        description: error.response?.data?.message || "Failed to delete asset",
         variant: "destructive"
       });
     }
@@ -205,10 +252,7 @@ export default function AssetRegisterPage() {
       purchase_cost: asset.purchase_cost,
       status: asset.status,
       location: asset.location || '',
-      description: asset.description || '',
-      warranty_expiry: asset.warranty_expiry || '',
-      depreciation_method: asset.depreciation_method || 'straight_line',
-      useful_life_years: asset.useful_life_years || 5,
+      notes: asset.notes || '',
       asset_tag: asset.asset_tag,
       depreciation_start: asset.depreciation_start || ''
     });
@@ -224,10 +268,7 @@ export default function AssetRegisterPage() {
       purchase_cost: 0,
       status: 'in_stock',
       location: '',
-      description: '',
-      warranty_expiry: '',
-      depreciation_method: 'straight_line',
-      useful_life_years: 5,
+      notes: '',
       asset_tag: '',
       depreciation_start: ''
     });
@@ -240,30 +281,54 @@ export default function AssetRegisterPage() {
       case 'assigned': return 'bg-purple-100 text-purple-800';
       case 'maintenance': return 'bg-yellow-100 text-yellow-800';
       case 'retired': return 'bg-gray-100 text-gray-800';
-      case 'lost': return 'bg-red-100 text-red-800';
-      case 'damaged': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getConditionBadgeColor = (condition: string | undefined) => {
-    if (!condition) return 'bg-gray-100 text-gray-800';
-    switch (condition) {
-      case 'excellent': return 'bg-green-100 text-green-800';
-      case 'good': return 'bg-blue-100 text-blue-800';
-      case 'fair': return 'bg-yellow-100 text-yellow-800';
-      case 'poor': return 'bg-orange-100 text-orange-800';
-      case 'critical': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+
 
   const filteredAssets = assets.filter(asset => {
     const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          asset.asset_tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          asset.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         asset.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+                         asset.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
+    const matchesCategory = categoryFilter === 'all' || asset.category_id === categoryFilter;
+    
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
+  // Sorting logic
+  const sortedAssets = [...filteredAssets].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    
+    // If sorting by name, asset_tag, serial_number, or notes, compare as strings
+    if (["name", "asset_tag", "serial_number", "notes"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    
+    // If sorting by purchase_cost or current_value, compare as numbers
+    if (["purchase_cost", "current_value"].includes(sortKey)) {
+      aValue = parseFloat(aValue) || 0;
+      bValue = parseFloat(bValue) || 0;
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+    }
+    
+    // If sorting by created_at, purchase_date, or depreciation_start, compare as dates
+    if (["created_at", "purchase_date", "depreciation_start"].includes(sortKey) && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    
+    // Default fallback
+    return 0;
   });
 
   const statusOptions = [
@@ -272,20 +337,12 @@ export default function AssetRegisterPage() {
     { value: 'in_stock', label: 'In Stock' },
     { value: 'assigned', label: 'Assigned' },
     { value: 'maintenance', label: 'Under Maintenance' },
-    { value: 'retired', label: 'Retired' },
-    { value: 'lost', label: 'Lost' },
-    { value: 'damaged', label: 'Damaged' }
+    { value: 'retired', label: 'Retired' }
   ];
 
   if (!user) {
     return (
-      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
-        name: '',
-        email: '',
-        role: '',
-        avatarUrl: '',
-        companyId: ''
-      }}>
+      <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -294,13 +351,7 @@ export default function AssetRegisterPage() {
   }
 
   return (
-    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management" user={{
-      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
-      email: user.email,
-      role: user.role,
-      avatarUrl: user.avatar_url || '',
-      companyId: user.company_id || ''
-    }}>
+    <ExtensibleLayout moduleSidebar={assetsSidebarSections} moduleTitle="Asset Management">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -325,170 +376,110 @@ export default function AssetRegisterPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleCreateAsset}>
-                  <Tabs defaultValue="basic" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                      <TabsTrigger value="financial">Financial</TabsTrigger>
-                      <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="basic" className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="name">Asset Name</Label>
-                          <Input
-                            id="name"
-                            value={formData.name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset_tag">Asset Tag</Label>
-                          <Input
-                            id="asset_tag"
-                            value={formData.asset_tag}
-                            onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="category_id">Category</Label>
-                          <Select
-                            value={formData.category_id}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map((category) => (
-                                <SelectItem key={category.id} value={category.id}>
-                                  {category.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="serial_number">Serial Number</Label>
-                          <Input
-                            id="serial_number"
-                            value={formData.serial_number}
-                            onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="status">Status</Label>
-                          <Select
-                            value={formData.status}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Asset['status'] }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statusOptions.filter(opt => opt.value !== 'all').map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="location">Location</Label>
-                          <Input
-                            id="location"
-                            value={formData.location}
-                            onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                          />
-                        </div>
-                      </div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                          id="description"
-                          value={formData.description}
-                          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                          rows={3}
+                        <Label htmlFor="name">Asset Name</Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                          required
                         />
                       </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="financial" className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="purchase_date">Purchase Date</Label>
-                          <Input
-                            id="purchase_date"
-                            type="date"
-                            value={formData.purchase_date}
-                            onChange={(e) => setFormData(prev => ({ ...prev, purchase_date: e.target.value }))}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="purchase_cost">Purchase Cost</Label>
-                          <Input
-                            id="purchase_cost"
-                            type="number"
-                            step="0.01"
-                            value={formData.purchase_cost}
-                            onChange={(e) => setFormData(prev => ({ ...prev, purchase_cost: parseFloat(e.target.value) || 0 }))}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="depreciation_method">Depreciation Method</Label>
-                          <Select
-                            value={formData.depreciation_method}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, depreciation_method: value as 'straight_line' | 'declining_balance' }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="straight_line">Straight Line</SelectItem>
-                              <SelectItem value="declining_balance">Declining Balance</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="useful_life_years">Useful Life (Years)</Label>
-                          <Input
-                            id="useful_life_years"
-                            type="number"
-                            value={formData.useful_life_years}
-                            onChange={(e) => setFormData(prev => ({ ...prev, useful_life_years: parseInt(e.target.value) || 5 }))}
-                          />
-                        </div>
+                      <div>
+                        <Label htmlFor="asset_tag">Asset Tag</Label>
+                        <Input
+                          id="asset_tag"
+                          value={formData.asset_tag}
+                          onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
+                          required
+                        />
                       </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="advanced" className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="warranty_expiry">Warranty Expiry</Label>
-                          <Input
-                            id="warranty_expiry"
-                            type="date"
-                            value={formData.warranty_expiry}
-                            onChange={(e) => setFormData(prev => ({ ...prev, warranty_expiry: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="depreciation_start">Depreciation Start Date</Label>
-                          <Input
-                            id="depreciation_start"
-                            type="date"
-                            value={formData.depreciation_start}
-                            onChange={(e) => setFormData(prev => ({ ...prev, depreciation_start: e.target.value }))}
-                          />
-                        </div>
+                      <div>
+                        <Label htmlFor="category_id">Category</Label>
+                        <Select
+                          value={formData.category_id}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                      <div>
+                        <Label htmlFor="serial_number">Serial Number</Label>
+                        <Input
+                          id="serial_number"
+                          value={formData.serial_number}
+                          onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={formData.status}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Asset['status'] }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.filter(opt => opt.value !== 'all').map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="location">Location</Label>
+                        <Input
+                          id="location"
+                          value={formData.location}
+                          onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="purchase_date">Purchase Date</Label>
+                        <Input
+                          id="purchase_date"
+                          type="date"
+                          value={formData.purchase_date}
+                          onChange={(e) => setFormData(prev => ({ ...prev, purchase_date: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="purchase_cost">Purchase Cost</Label>
+                        <Input
+                          id="purchase_cost"
+                          type="number"
+                          step="0.01"
+                          value={formData.purchase_cost}
+                          onChange={(e) => setFormData(prev => ({ ...prev, purchase_cost: parseFloat(e.target.value) || 0 }))}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        value={formData.notes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
                   
                   <DialogFooter className="mt-6">
                     <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -516,33 +507,59 @@ export default function AssetRegisterPage() {
               className="pl-10"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-48">
-              <Tag className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-48">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-48">
+                <Tag className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Sort Dropdown */}
+            <Select value={sortKey} onValueChange={setSortKey}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Sort by Created Date</SelectItem>
+                <SelectItem value="name">Sort by Name</SelectItem>
+                <SelectItem value="asset_tag">Sort by Asset Tag</SelectItem>
+                <SelectItem value="purchase_cost">Sort by Purchase Cost</SelectItem>
+                <SelectItem value="current_value">Sort by Current Value</SelectItem>
+                <SelectItem value="purchase_date">Sort by Purchase Date</SelectItem>
+                <SelectItem value="status">Sort by Status</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-10 flex items-center justify-center"
+              onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+              aria-label={sortDirection === "asc" ? "Sort ascending" : "Sort descending"}
+            >
+              {sortDirection === "asc" ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </Button>
+          </div>
         </div>
 
         {/* Assets Grid */}
@@ -552,7 +569,7 @@ export default function AssetRegisterPage() {
           </div>
         ) : (
           <div className="grid gap-6">
-            {filteredAssets.map((asset) => (
+            {sortedAssets.map((asset) => (
               <Card key={asset.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -566,11 +583,6 @@ export default function AssetRegisterPage() {
                           <Badge className={`${getStatusBadgeColor(asset.status)} border-0`}>
                             {asset.status.replace('_', ' ').toUpperCase()}
                           </Badge>
-                          {asset.condition && (
-                            <Badge className={`${getConditionBadgeColor(asset.condition)} border-0`}>
-                              {asset.condition.toUpperCase()}
-                            </Badge>
-                          )}
                         </div>
                       </div>
                       
@@ -593,8 +605,8 @@ export default function AssetRegisterPage() {
                         </div>
                       </div>
                       
-                      {asset.description && (
-                        <p className="text-sm text-gray-600 mt-3">{asset.description}</p>
+                      {asset.notes && (
+                        <p className="text-sm text-gray-600 mt-3">{asset.notes}</p>
                       )}
                     </div>
                     
@@ -702,11 +714,11 @@ export default function AssetRegisterPage() {
                 </div>
               </div>
               <div className="mt-4">
-                <Label htmlFor="edit_description">Description</Label>
+                <Label htmlFor="edit_notes">Notes</Label>
                 <Textarea
-                  id="edit_description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  id="edit_notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                 />
               </div>

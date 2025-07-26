@@ -6,9 +6,11 @@ import React, {
     useCallback,
     useRef,
     ReactNode,
+    useMemo,
   } from "react";
   import axios, { AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
   import { jwtDecode } from "jwt-decode";
+  import { apiClient } from "@/apis/core/client";
   
   /***************************************
    * CONFIGURATION                       *
@@ -91,20 +93,7 @@ import React, {
   /***************************************
    * AXIOS INSTANCE & INTERCEPTORS       *
    **************************************/
-  const apiClient = axios.create({
-    baseURL: API_BASE_URL,
-  });
-  
-  /**
-   * Attach Authorization header if accessToken exists.
-   */
-  apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-    const token = readStorage<string>(STORAGE_KEYS.accessToken);
-    if (token && config.headers) {
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
-    return config;
-  });
+  // All references to apiClient now use the imported instance, which supports setAuthToken.
   
   /***************************************
    * AUTH PROVIDER IMPLEMENTATION        *
@@ -128,7 +117,7 @@ import React, {
       removeStorage(STORAGE_KEYS.user);
       setUser(null);
       if (refreshTimerId) window.clearTimeout(refreshTimerId);
-      delete apiClient.defaults.headers.common["Authorization"];
+      apiClient.setAuthToken(null);
     }, [refreshTimerId]);
   
     const scheduleTokenRefresh = useCallback((accessToken: string, accessTokenExpires?: string) => {
@@ -182,7 +171,7 @@ import React, {
       writeStorage(STORAGE_KEYS.refreshToken, res.data.tokens.refreshToken);
       writeStorage(STORAGE_KEYS.user, res.data.user);
   
-      apiClient.defaults.headers.common["Authorization"] = `Bearer ${res.data.tokens.accessToken}`;
+      apiClient.setAuthToken(res.data.tokens.accessToken); // <-- Ensure token is set after refresh
       setUser(res.data.user);
       scheduleTokenRefresh(res.data.tokens.accessToken, res.data.tokens.accessTokenExpires);
     }, [scheduleTokenRefresh]);
@@ -202,7 +191,7 @@ import React, {
       writeStorage(STORAGE_KEYS.refreshToken, tokens.refreshToken);
       writeStorage(STORAGE_KEYS.user, usr);
   
-      apiClient.defaults.headers.common["Authorization"] = `Bearer ${tokens.accessToken}`;
+      apiClient.setAuthToken(tokens.accessToken); // <-- Ensure token is set after login/register/refresh
       setUser(usr);
       scheduleTokenRefresh(tokens.accessToken, tokens.accessTokenExpires);
     }, [scheduleTokenRefresh]);
@@ -265,8 +254,7 @@ import React, {
       
       if (storedUser && accessToken) {
         setUser(storedUser);
-        // Attach header for SSR / first render
-        apiClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+        apiClient.setAuthToken(accessToken); // <-- Ensure token is set on hydration
         // Schedule refresh based on existing token
         scheduleTokenRefresh(accessToken);
       }
@@ -275,36 +263,7 @@ import React, {
       setIsHydrated(true);
     }, []);
   
-    /***********************************
-     * GLOBAL RESPONSE INTERCEPTOR      *
-     ***********************************/
-    useEffect(() => {
-      const interceptorId = apiClient.interceptors.response.use(
-        (response) => response,
-        async (error: AxiosError) => {
-          if (error.response?.status === 401) {
-            // Attempt token refresh once
-            try {
-              if (refreshTokensRef.current) {
-                await refreshTokensRef.current();
-                // Retry original request with new token
-                if (error.config) {
-                  return apiClient(error.config as AxiosRequestConfig);
-                }
-              }
-            } catch (refreshError) {
-              if (logoutRef.current) {
-                logoutRef.current();
-              }
-            }
-          }
-          return Promise.reject(error);
-        }
-      );
-      return () => {
-        apiClient.interceptors.response.eject(interceptorId);
-      };
-    }, []);
+    // (Optional) If you want to add interceptors, do so in the ApiClient class itself.
   
       const value: AuthContextType = {
     user,
@@ -321,7 +280,14 @@ import React, {
   // Export the configured API client for use in other hooks
   (value as any).apiClient = apiClient;
   
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    const memoizedValue = useMemo(() => value, [
+      user,
+      loading,
+      isHydrated,
+      error
+    ]);
+    (memoizedValue as any).apiClient = apiClient;
+    return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;
   };
   
   /***************************************

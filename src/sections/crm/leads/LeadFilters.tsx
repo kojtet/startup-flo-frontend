@@ -2,6 +2,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import type { Category } from "@/apis/types";
+import { Button } from "@/components/ui/button";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 interface LeadFiltersProps {
   searchTerm: string;
@@ -11,6 +13,10 @@ interface LeadFiltersProps {
   categoryFilter: string;
   setCategoryFilter: (value: string) => void;
   categories?: Category[];
+  sortKey: string;
+  setSortKey: (value: string) => void;
+  sortDirection: "asc" | "desc";
+  setSortDirection: (value: "asc" | "desc") => void;
 }
 
 export const LeadFilters = ({ 
@@ -20,10 +26,14 @@ export const LeadFilters = ({
   setStatusFilter,
   categoryFilter,
   setCategoryFilter,
-  categories = []
+  categories = [],
+  sortKey,
+  setSortKey,
+  sortDirection,
+  setSortDirection
 }: LeadFiltersProps) => {
   return (
-    <div className="flex gap-4 items-center">
+    <div className="flex gap-4 items-center flex-wrap">
       <div className="relative flex-1 max-w-md">
         <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
         <Input 
@@ -67,6 +77,27 @@ export const LeadFilters = ({
           ))}
         </SelectContent>
       </Select>
+      {/* Sort Dropdown */}
+      <Select value={sortKey} onValueChange={setSortKey}>
+        <SelectTrigger className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="created_at">Sort by Created Date</SelectItem>
+          <SelectItem value="name">Sort by Name</SelectItem>
+          <SelectItem value="email">Sort by Email</SelectItem>
+          <SelectItem value="status">Sort by Status</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-10 flex items-center justify-center"
+        onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+        aria-label={sortDirection === "asc" ? "Sort ascending" : "Sort descending"}
+      >
+        {sortDirection === "asc" ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+      </Button>
     </div>
   );
 }; 

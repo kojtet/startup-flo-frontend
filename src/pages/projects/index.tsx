@@ -1,15 +1,126 @@
 import { ExtensibleLayout } from "@/components/layout/ExtensibleLayout";
 import { projectsSidebarSections } from "@/components/sidebars/ProjectsSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FolderKanban, ClipboardList, Target, Users2 } from "lucide-react";
+import { FolderKanban, ClipboardList, Target, Users2, Loader2, AlertTriangle } from "lucide-react";
+import { useProjects } from "@/hooks/useProjects";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useMemo } from "react";
 
 export default function ProjectsDashboard() {
-  const user = {
-    name: "John Doe",
-    email: "john.doe@company.com",
-    role: "Administrator",
-    avatarUrl: undefined
-  };
+  const { user, loading: authLoading } = useAuth();
+  const {
+    projects,
+    isLoadingProjects,
+    projectsError,
+    fetchProjects,
+    projectTasks,
+    isLoadingTasks,
+    tasksError,
+    fetchProjectTasks,
+    projectDeliverables,
+    isLoadingDeliverables,
+    deliverablesError,
+    fetchProjectDeliverables,
+  } = useProjects();
+
+  // Fetch all data on mount
+  useEffect(() => {
+    if (user?.company_id) {
+      fetchProjects();
+      fetchProjectTasks();
+      fetchProjectDeliverables();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.company_id]);
+
+  // Compute dashboard stats
+  const activeProjects = useMemo(() => projects.filter(p => p.status === "active").length, [projects]);
+  const myTasks = useMemo(() => user ? projectTasks.filter(t => t.owner_id === user.id).length : 0, [projectTasks, user]);
+  const myTasksDueThisWeek = useMemo(() => {
+    if (!user) return 0;
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return projectTasks.filter(t => t.owner_id === user.id && t.due_date && new Date(t.due_date) <= weekFromNow && new Date(t.due_date) >= now).length;
+  }, [projectTasks, user]);
+  const deliverables = useMemo(() => projectDeliverables.length, [projectDeliverables]);
+  const overdueDeliverables = useMemo(() => {
+    const now = new Date();
+    return projectDeliverables.filter(d => d.status !== "completed" && new Date(d.expected_date) < now).length;
+  }, [projectDeliverables]);
+  const teamMembers = useMemo(() => {
+    // Unique team_lead from projects + unique owners from tasks
+    const leads = projects.map(p => p.team_lead).filter(Boolean);
+    const owners = projectTasks.map(t => t.owner_id).filter(Boolean);
+    return new Set([...leads, ...owners]).size;
+  }, [projects, projectTasks]);
+
+  // Recent projects (last 3 by created_at)
+  const recentProjects = useMemo(() => {
+    return [...projects]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 3);
+  }, [projects]);
+
+  // Upcoming deadlines (next 3 deliverables/tasks by due/expected date)
+  const upcomingDeadlines = useMemo(() => {
+    const now = new Date();
+    const deliverableDeadlines = projectDeliverables
+      .filter(d => d.status !== "completed" && new Date(d.expected_date) >= now)
+      .map(d => ({
+        type: "Deliverable",
+        name: d.name,
+        date: d.expected_date,
+        projectId: d.project_id,
+      }));
+    const taskDeadlines = projectTasks
+      .filter(t => t.status !== "done" && t.due_date && new Date(t.due_date) >= now)
+      .map(t => ({
+        type: "Task",
+        name: t.title,
+        date: t.due_date!,
+        projectId: t.project_id,
+      }));
+    return [...deliverableDeadlines, ...taskDeadlines]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 3);
+  }, [projectDeliverables, projectTasks]);
+
+  // Loading and error states
+  const isLoading = authLoading || isLoadingProjects || isLoadingTasks || isLoadingDeliverables;
+  const error = projectsError || tasksError || deliverablesError;
+
+  if (isLoading) {
+    return (
+      <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading dashboard...</span>
+        </div>
+      </ExtensibleLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600 mb-4">{error}</p>
+            <button className="btn" onClick={() => {
+              if (user?.company_id) {
+                fetchProjects();
+                fetchProjectTasks();
+                fetchProjectDeliverables();
+              }
+            }}>
+              Try Again
+            </button>
+          </div>
+        </div>
+      </ExtensibleLayout>
+    );
+  }
 
   return (
     <ExtensibleLayout moduleSidebar={projectsSidebarSections} moduleTitle="Project Management">
@@ -26,8 +137,8 @@ export default function ProjectsDashboard() {
               <FolderKanban className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">3 launching this month</p>
+              <div className="text-2xl font-bold">{activeProjects}</div>
+              <p className="text-xs text-muted-foreground">{activeProjects === 1 ? "1 active" : `${activeProjects} active`}</p>
             </CardContent>
           </Card>
 
@@ -37,8 +148,8 @@ export default function ProjectsDashboard() {
               <ClipboardList className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">23</div>
-              <p className="text-xs text-muted-foreground">5 due this week</p>
+              <div className="text-2xl font-bold">{myTasks}</div>
+              <p className="text-xs text-muted-foreground">{myTasksDueThisWeek} due this week</p>
             </CardContent>
           </Card>
 
@@ -48,8 +159,8 @@ export default function ProjectsDashboard() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">8</div>
-              <p className="text-xs text-muted-foreground">2 overdue</p>
+              <div className="text-2xl font-bold">{deliverables}</div>
+              <p className="text-xs text-muted-foreground">{overdueDeliverables} overdue</p>
             </CardContent>
           </Card>
 
@@ -59,7 +170,7 @@ export default function ProjectsDashboard() {
               <Users2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">47</div>
+              <div className="text-2xl font-bold">{teamMembers}</div>
               <p className="text-xs text-muted-foreground">Across all projects</p>
             </CardContent>
           </Card>
@@ -72,33 +183,18 @@ export default function ProjectsDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Website Redesign</p>
-                    <p className="text-sm text-gray-500">Marketing Team • 75% Complete</p>
+                {recentProjects.length === 0 && <p className="text-gray-500">No recent projects.</p>}
+                {recentProjects.map((project) => (
+                  <div key={project.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{project.name}</p>
+                      <p className="text-sm text-gray-500">{project.description}</p>
+                    </div>
+                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${project.progress ?? 0}%` }}></div>
+                    </div>
                   </div>
-                  <div className="w-16 bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: "75%" }}></div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Mobile App Launch</p>
-                    <p className="text-sm text-gray-500">Development Team • 45% Complete</p>
-                  </div>
-                  <div className="w-16 bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: "45%" }}></div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Q1 Campaign</p>
-                    <p className="text-sm text-gray-500">Sales Team • 90% Complete</p>
-                  </div>
-                  <div className="w-16 bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: "90%" }}></div>
-                  </div>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -109,27 +205,16 @@ export default function ProjectsDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Website wireframes due</p>
-                    <p className="text-xs text-gray-500">Tomorrow • Website Redesign</p>
+                {upcomingDeadlines.length === 0 && <p className="text-gray-500">No upcoming deadlines.</p>}
+                {upcomingDeadlines.map((item, idx) => (
+                  <div key={idx} className="flex items-center space-x-3">
+                    <div className={`w-2 h-2 rounded-full ${item.type === "Deliverable" ? "bg-red-500" : "bg-yellow-500"}`}></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{item.name}</p>
+                      <p className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()} • {item.type}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">App testing phase</p>
-                    <p className="text-xs text-gray-500">Dec 28 • Mobile App Launch</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Campaign review</p>
-                    <p className="text-xs text-gray-500">Jan 5 • Q1 Campaign</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>

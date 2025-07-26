@@ -91,14 +91,48 @@ export function useProjects() {
 
     setIsLoadingTasks(true);
     setTasksError(null);
-    
     try {
-      const url = projectId ? `/project-tasks?project_id=${projectId}` : '/project-tasks';
-      const response = await apiClient.get(url);
-      setProjectTasks(response.data);
+      if (projectId) {
+        // Use the correct endpoint for a specific project
+        const response = await apiClient.get(`/project-tasks/project/${projectId}`);
+        setProjectTasks(response.data);
+      } else {
+        // Fetch all projects, then fetch tasks for each project and aggregate
+        const projectsResponse = await apiClient.get('/projects');
+        const projects = Array.isArray(projectsResponse.data)
+          ? projectsResponse.data
+          : projectsResponse.data.data || [];
+        const allTasks: any[] = [];
+        for (const project of projects) {
+          try {
+            const tasksResponse = await apiClient.get(`/project-tasks/project/${project.id}`);
+            if (Array.isArray(tasksResponse.data)) {
+              allTasks.push(...tasksResponse.data);
+            } else if (Array.isArray(tasksResponse.data.data)) {
+              allTasks.push(...tasksResponse.data.data);
+            }
+          } catch (err: any) {
+            if (err.response && err.response.status === 404) {
+              // No tasks for this project, skip
+              continue;
+            } else {
+              // Other errors, log and continue
+              console.error(`Failed to fetch tasks for project ${project.id}:`, err);
+              continue;
+            }
+          }
+        }
+        setProjectTasks(allTasks);
+      }
     } catch (error: any) {
       console.error('Failed to fetch project tasks:', error);
-      setTasksError(error.response?.data?.message || 'Failed to fetch project tasks');
+      if (error.response && error.response.status === 404) {
+        // Gracefully handle 404 (not found) by setting empty tasks
+        setProjectTasks([]);
+        setTasksError(null);
+      } else {
+        setTasksError(error.response?.data?.message || 'Failed to fetch project tasks');
+      }
     } finally {
       setIsLoadingTasks(false);
     }
@@ -139,14 +173,48 @@ export function useProjects() {
 
     setIsLoadingDeliverables(true);
     setDeliverablesError(null);
-    
     try {
-      const url = projectId ? `/project-deliverables?project_id=${projectId}` : '/project-deliverables';
-      const response = await apiClient.get(url);
-      setProjectDeliverables(response.data);
+      if (projectId) {
+        // Use the correct endpoint for a specific project
+        const response = await apiClient.get(`/project-deliverables/project/${projectId}`);
+        setProjectDeliverables(response.data);
+      } else {
+        // Fetch all projects, then fetch deliverables for each project and aggregate
+        const projectsResponse = await apiClient.get('/projects');
+        const projects = Array.isArray(projectsResponse.data)
+          ? projectsResponse.data
+          : projectsResponse.data.data || [];
+        const allDeliverables: any[] = [];
+        for (const project of projects) {
+          try {
+            const deliverablesResponse = await apiClient.get(`/project-deliverables/project/${project.id}`);
+            if (Array.isArray(deliverablesResponse.data)) {
+              allDeliverables.push(...deliverablesResponse.data);
+            } else if (Array.isArray(deliverablesResponse.data.data)) {
+              allDeliverables.push(...deliverablesResponse.data.data);
+            }
+          } catch (err: any) {
+            if (err.response && err.response.status === 404) {
+              // No deliverables for this project, skip
+              continue;
+            } else {
+              // Other errors, log and continue
+              console.error(`Failed to fetch deliverables for project ${project.id}:`, err);
+              continue;
+            }
+          }
+        }
+        setProjectDeliverables(allDeliverables);
+      }
     } catch (error: any) {
       console.error('Failed to fetch project deliverables:', error);
-      setDeliverablesError(error.response?.data?.message || 'Failed to fetch project deliverables');
+      if (error.response && error.response.status === 404) {
+        // Gracefully handle 404 (not found) by setting empty deliverables
+        setProjectDeliverables([]);
+        setDeliverablesError(null);
+      } else {
+        setDeliverablesError(error.response?.data?.message || 'Failed to fetch project deliverables');
+      }
     } finally {
       setIsLoadingDeliverables(false);
     }

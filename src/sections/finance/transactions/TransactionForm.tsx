@@ -30,6 +30,9 @@ interface TransactionFormProps {
   accounts: FinancialAccount[];
   categories: FinanceCategory[];
   budgetAllocations: BudgetAllocation[];
+  isLoadingAccounts?: boolean;
+  isLoadingCategories?: boolean;
+  isLoadingBudgets?: boolean;
 }
 
 export function TransactionForm({ 
@@ -40,8 +43,14 @@ export function TransactionForm({
   isLoading = false,
   accounts,
   categories,
-  budgetAllocations
+  budgetAllocations,
+  isLoadingAccounts = false,
+  isLoadingCategories = false,
+  isLoadingBudgets = false
 }: TransactionFormProps) {
+  // Debug logging
+  console.log('TransactionForm props:', { accounts, categories, budgetAllocations });
+  
   const [formData, setFormData] = useState<CreateTransactionData>({
     account_id: '',
     category_id: '',
@@ -175,16 +184,23 @@ export function TransactionForm({
               <Select
                 value={formData.account_id}
                 onValueChange={(value) => handleInputChange('account_id', value)}
+                disabled={isLoadingAccounts}
               >
                 <SelectTrigger className={errors.account_id ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={isLoadingAccounts ? "Loading accounts..." : "Select account"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map(account => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
+                  {isLoadingAccounts ? (
+                    <SelectItem value="loading" disabled>Loading accounts...</SelectItem>
+                  ) : accounts.length === 0 ? (
+                    <SelectItem value="no-accounts" disabled>No accounts available</SelectItem>
+                  ) : (
+                    accounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.account_id && <p className="text-sm text-red-500">{errors.account_id}</p>}
@@ -195,16 +211,23 @@ export function TransactionForm({
               <Select
                 value={formData.category_id}
                 onValueChange={(value) => handleInputChange('category_id', value)}
+                disabled={isLoadingCategories}
               >
                 <SelectTrigger className={errors.category_id ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select category"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredCategories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {isLoadingCategories ? (
+                    <SelectItem value="loading" disabled>Loading categories...</SelectItem>
+                  ) : filteredCategories.length === 0 ? (
+                    <SelectItem value="no-categories" disabled>No categories available for {formData.type}</SelectItem>
+                  ) : (
+                    filteredCategories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.category_id && <p className="text-sm text-red-500">{errors.category_id}</p>}
@@ -213,17 +236,17 @@ export function TransactionForm({
             <div className="grid gap-2">
               <Label htmlFor="transaction-budget-allocation">Budget Allocation (Optional)</Label>
               <Select
-                value={formData.budget_allocation_id}
-                onValueChange={(value) => handleInputChange('budget_allocation_id', value)}
+                value={formData.budget_allocation_id || 'none'}
+                onValueChange={(value) => handleInputChange('budget_allocation_id', value === 'none' ? undefined : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select budget allocation" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No allocation</SelectItem>
-                  {budgetAllocations.map(allocation => (
+                  <SelectItem value="none">No allocation</SelectItem>
+                  {budgetAllocations.filter(a => a.id && a.id !== '').map(allocation => (
                     <SelectItem key={allocation.id} value={allocation.id}>
-                      {allocation.category.name} - ${allocation.amount_allocated.toLocaleString()}
+                      {allocation.category?.name ?? 'Unknown'} - ${allocation.amount_allocated?.toLocaleString?.() ?? '0'}
                     </SelectItem>
                   ))}
                 </SelectContent>

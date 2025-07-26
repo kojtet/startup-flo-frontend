@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { useOpportunities } from "@/sections/crm/opportunities/useOpportunities";
 import { OpportunityPagination } from "@/sections/crm/opportunities/OpportunityPagination";
 import type { Opportunity, UpdateOpportunityData } from "@/apis/types";
@@ -54,6 +55,10 @@ export default function Opportunities() {
     handleDeleteOpportunity,
     handleMoveStage,
     resetFormData,
+    sortKey,
+    setSortKey,
+    sortDirection,
+    setSortDirection,
   } = useOpportunities();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -368,6 +373,27 @@ export default function Opportunities() {
               ))}
             </SelectContent>
           </Select>
+          {/* Sort Dropdown */}
+          <Select value={sortKey} onValueChange={setSortKey}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at">Sort by Created Date</SelectItem>
+              <SelectItem value="name">Sort by Name</SelectItem>
+              <SelectItem value="amount">Sort by Amount</SelectItem>
+              <SelectItem value="expected_close">Sort by Close Date</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-10 flex items-center justify-center"
+            onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+            aria-label={sortDirection === "asc" ? "Sort ascending" : "Sort descending"}
+          >
+            {sortDirection === "asc" ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </Button>
         </div>
 
         {loading ? (

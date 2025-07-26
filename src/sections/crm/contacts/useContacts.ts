@@ -21,6 +21,8 @@ export const useContacts = () => {
   const [accountFilter, setAccountFilter] = useState("all");
   const [leadFilter, setLeadFilter] = useState("all");
   const [formLoading, setFormLoading] = useState(false);
+  const [sortKey, setSortKey] = useState<string>("created_at"); // default to created_at if available
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -158,11 +160,33 @@ export const useContacts = () => {
     return matchesSearch && matchesAccount && matchesLead;
   });
 
+  // Sorting logic
+  const sortedContacts = [...filteredContacts].sort((a, b) => {
+    let aValue = a[sortKey] ?? "";
+    let bValue = b[sortKey] ?? "";
+    // If sorting by first_name, last_name, or email, compare as strings
+    if (["first_name", "last_name", "email"].includes(sortKey)) {
+      aValue = (aValue || "").toString().toLowerCase();
+      bValue = (bValue || "").toString().toLowerCase();
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+    // If sorting by created_at or other date, compare as dates
+    if (sortKey === "created_at" && aValue && bValue) {
+      const aDate = new Date(aValue);
+      const bDate = new Date(bValue);
+      return sortDirection === "asc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+    }
+    // Default fallback
+    return 0;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedContacts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedContacts = filteredContacts.slice(startIndex, endIndex);
+  const paginatedContacts = sortedContacts.slice(startIndex, endIndex);
 
   // Reset to first page when search or filters change
   useEffect(() => {
@@ -172,7 +196,7 @@ export const useContacts = () => {
   return {
     // State
     contacts: paginatedContacts,
-    allContacts: filteredContacts,
+    allContacts: sortedContacts,
     loading: isLoadingContacts,
     formLoading,
     searchTerm,
@@ -185,13 +209,16 @@ export const useContacts = () => {
     formData,
     leads: apiLeads,
     accounts: apiAccounts,
-    
+    sortKey,
+    sortDirection,
     // Actions
     setSearchTerm,
     setAccountFilter,
     setLeadFilter,
     setCurrentPage,
     setFormData,
+    setSortKey,
+    setSortDirection,
     handleCreateContact,
     handleEditContact,
     handleDeleteContact,

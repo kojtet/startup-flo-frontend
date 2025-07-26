@@ -13,13 +13,12 @@ import type { Transaction, CreateTransactionData, UpdateTransactionData } from '
 export function TransactionsSection() {
   const { toast } = useToast();
   const { 
-    transactions, 
     accounts, 
     categories, 
-    budgetAllocations,
-    isLoading: isDataLoading,
-    error: dataError,
-    refetch: refetchData
+    budgets,
+    isLoadingAccounts,
+    isLoadingCategories,
+    isLoadingBudgets
   } = useFinance();
 
   const {
@@ -27,30 +26,23 @@ export function TransactionsSection() {
     filteredTransactions,
     currentPage,
     totalPages,
-    totalItems,
     isLoading,
-    isSubmitting,
-    
-    // Filters
+    error,
     searchTerm,
-    typeFilter,
-    accountFilter,
-    categoryFilter,
-    budgetAllocationFilter,
-    
-    // Actions
     setSearchTerm,
+    typeFilter,
     setTypeFilter,
+    accountFilter,
     setAccountFilter,
+    categoryFilter,
     setCategoryFilter,
+    budgetAllocationFilter,
     setBudgetAllocationFilter,
     setCurrentPage,
-    clearFilters,
-    
-    // CRUD operations
-    createTransaction,
-    updateTransaction,
-    deleteTransaction
+    handleCreateTransaction,
+    handleUpdateTransaction,
+    handleDeleteTransaction,
+    refreshTransactions
   } = useTransactions();
 
   // Form state
@@ -59,24 +51,24 @@ export function TransactionsSection() {
 
   // Handle data loading errors
   useEffect(() => {
-    if (dataError) {
+    if (error) {
       toast({
         title: "Error",
         description: "Failed to load transaction data. Please try again.",
         variant: "destructive",
       });
     }
-  }, [dataError, toast]);
+  }, [error, toast]);
 
-  const handleCreateTransaction = async (data: CreateTransactionData) => {
+  const handleCreate = async (data: CreateTransactionData) => {
     try {
-      await createTransaction(data);
+      await handleCreateTransaction(data);
       toast({
         title: "Success",
         description: "Transaction created successfully.",
       });
       setIsFormOpen(false);
-      refetchData(); // Refresh data to get updated lists
+      refreshTransactions();
     } catch (error) {
       toast({
         title: "Error",
@@ -86,17 +78,16 @@ export function TransactionsSection() {
     }
   };
 
-  const handleUpdateTransaction = async (data: UpdateTransactionData) => {
+  const handleUpdate = async (data: UpdateTransactionData) => {
     if (!editingTransaction) return;
-    
     try {
-      await updateTransaction(editingTransaction.id, data);
+      await handleUpdateTransaction(editingTransaction.id, data);
       toast({
         title: "Success",
         description: "Transaction updated successfully.",
       });
       setEditingTransaction(null);
-      refetchData(); // Refresh data to get updated lists
+      refreshTransactions();
     } catch (error) {
       toast({
         title: "Error",
@@ -106,14 +97,14 @@ export function TransactionsSection() {
     }
   };
 
-  const handleDeleteTransaction = async (transactionId: string) => {
+  const handleDelete = async (transactionId: string) => {
     try {
-      await deleteTransaction(transactionId);
+      await handleDeleteTransaction(transactionId);
       toast({
         title: "Success",
         description: "Transaction deleted successfully.",
       });
-      refetchData(); // Refresh data to get updated lists
+      refreshTransactions();
     } catch (error) {
       toast({
         title: "Error",
@@ -135,9 +126,9 @@ export function TransactionsSection() {
 
   const handleFormSubmit = async (data: CreateTransactionData | UpdateTransactionData) => {
     if (editingTransaction) {
-      await handleUpdateTransaction(data as UpdateTransactionData);
+      await handleUpdate(data as UpdateTransactionData);
     } else {
-      await handleCreateTransaction(data as CreateTransactionData);
+      await handleCreate(data as CreateTransactionData);
     }
   };
 
@@ -145,7 +136,9 @@ export function TransactionsSection() {
   const getAccountById = (id: string) => accounts.find(acc => acc.id === id);
   const getCategoryById = (id: string) => categories.find(cat => cat.id === id);
 
-  if (isDataLoading) {
+  const allBudgetAllocations = budgets.flatMap(b => b.allocations ?? []).filter(a => a.id && a.id !== '');
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -164,7 +157,7 @@ export function TransactionsSection() {
             Manage and track all financial transactions
           </p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} disabled={isSubmitting}>
+        <Button onClick={() => setIsFormOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Transaction
         </Button>
@@ -182,47 +175,18 @@ export function TransactionsSection() {
         onCategoryFilterChange={setCategoryFilter}
         budgetAllocationFilter={budgetAllocationFilter}
         onBudgetAllocationFilterChange={setBudgetAllocationFilter}
-        onClearFilters={clearFilters}
         accounts={accounts}
         categories={categories}
-        budgetAllocations={budgetAllocations}
+        budgetAllocations={allBudgetAllocations}
+        onClearFilters={() => {}}
       />
 
       {/* Transactions List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading transactions...</span>
-        </div>
-      ) : filteredTransactions.length === 0 ? (
+      {filteredTransactions.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-muted-foreground">
-            {searchTerm || typeFilter !== 'all' || accountFilter !== 'all' || 
-             categoryFilter !== 'all' || budgetAllocationFilter !== 'all' ? (
-              <>
-                <p className="text-lg font-medium">No transactions found</p>
-                <p className="text-sm">Try adjusting your filters or search terms.</p>
-                <Button 
-                  variant="outline" 
-                  onClick={clearFilters}
-                  className="mt-4"
-                >
-                  Clear Filters
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="text-lg font-medium">No transactions yet</p>
-                <p className="text-sm">Get started by creating your first transaction.</p>
-                <Button 
-                  onClick={() => setIsFormOpen(true)}
-                  className="mt-4"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Transaction
-                </Button>
-              </>
-            )}
+            <p className="text-lg font-medium">No transactions found</p>
+            <p className="text-sm">Try adjusting your filters or search terms.</p>
           </div>
         </div>
       ) : (
@@ -232,8 +196,7 @@ export function TransactionsSection() {
               key={transaction.id}
               transaction={transaction}
               onEdit={handleEditTransaction}
-              onDelete={handleDeleteTransaction}
-              isLoading={isSubmitting}
+              onDelete={handleDelete}
               account={getAccountById(transaction.account_id)}
               category={getCategoryById(transaction.category_id)}
             />
@@ -248,7 +211,7 @@ export function TransactionsSection() {
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           isLoading={isLoading}
-          totalItems={totalItems}
+          totalItems={filteredTransactions.length}
           itemsPerPage={10}
         />
       )}
@@ -259,10 +222,13 @@ export function TransactionsSection() {
         onClose={handleCloseForm}
         onSubmit={handleFormSubmit}
         transaction={editingTransaction}
-        isLoading={isSubmitting}
+        isLoading={isLoading}
         accounts={accounts}
         categories={categories}
-        budgetAllocations={budgetAllocations}
+        budgetAllocations={allBudgetAllocations}
+        isLoadingAccounts={isLoadingAccounts}
+        isLoadingCategories={isLoadingCategories}
+        isLoadingBudgets={isLoadingBudgets}
       />
     </div>
   );

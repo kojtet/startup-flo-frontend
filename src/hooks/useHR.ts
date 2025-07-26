@@ -37,8 +37,14 @@ export function useHR() {
     if (!user?.company_id) {
       throw new Error('No company ID available');
     }
-
-    const response = await apiClient.post('/hr/employees', employeeData);
+    const token = localStorage.getItem('sf_access_token');
+    console.log('[createEmployee] Token in localStorage:', token);
+    console.log('[createEmployee] Sending employeeData:', employeeData);
+    const response = await apiClient.post('/hr/employees', employeeData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     return response.data;
   }, [user?.company_id]);
 

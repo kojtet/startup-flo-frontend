@@ -17,7 +17,7 @@ export const financeSidebarSections: SidebarSection[] = [
       { label: "Accounts & Balances", href: "/finance/accounts-balances", icon: Wallet },
       { label: "Categories", href: "/finance/categories", icon: Tags },
       { label: "Transactions Ledger", href: "/finance/transactions-ledger", icon: ListOrdered },
-      { label: "Transfers", href: "/finance/transfers", icon: ArrowLeftRight },
+      // { label: "Transfers", href: "/finance/transfers", icon: ArrowLeftRight },
     ]
   },
   {

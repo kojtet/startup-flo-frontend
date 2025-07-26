@@ -169,7 +169,6 @@ export default function EmployeeDirectory() {
       toastRef({ title: "Error", description: "Company ID is missing.", variant: "destructive" });
       return;
     }
-    
     setIsSubmitting(true);
     try {
       if (editingEmployee) {
@@ -179,7 +178,6 @@ export default function EmployeeDirectory() {
       } else {
         // Create employee
         const employeeData: CreateEmployeeData = {
-          ...newEmployeeData,
           staff_id: newEmployeeData.staff_id || "",
           first_name: newEmployeeData.first_name || "",
           last_name: newEmployeeData.last_name || "",
@@ -191,8 +189,20 @@ export default function EmployeeDirectory() {
           date_hired: newEmployeeData.date_hired || new Date().toISOString().split('T')[0],
           status: newEmployeeData.status || "active"
         };
-        await createEmployee(employeeData);
-        toastRef({ title: "Success", description: "Employee added successfully." });
+        console.log("[Add Employee] Submitting employeeData:", employeeData);
+        await createEmployee(employeeData)
+          .then((res) => {
+            console.log("[Add Employee] API response:", res);
+            toastRef({ title: "Success", description: "Employee added successfully." });
+          })
+          .catch((err) => {
+            console.error("[Add Employee] API error:", err);
+            toastRef({
+              title: "Error",
+              description: "Failed to save employee.",
+              variant: "destructive",
+            });
+          });
       }
       setIsAddDialogOpen(false);
       setEditingEmployee(null);
@@ -208,6 +218,7 @@ export default function EmployeeDirectory() {
       });
       await fetchData(); // Refresh data
     } catch (error) {
+      console.error("[Add Employee] Unexpected error:", error);
       toastRef({
         title: "Error",
         description: "Failed to save employee.",

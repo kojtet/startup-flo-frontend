@@ -110,7 +110,7 @@ export function TransactionFilters({
           <SelectContent>
             <SelectItem value="all">All Allocations</SelectItem>
             <SelectItem value="none">No Allocation</SelectItem>
-            {budgetAllocations.map(allocation => (
+            {budgetAllocations.filter(a => a.id && a.id !== '').map(allocation => (
               <SelectItem key={allocation.id} value={allocation.id}>
                 {allocation.category.name} - ${allocation.amount_allocated.toLocaleString()}
               </SelectItem>

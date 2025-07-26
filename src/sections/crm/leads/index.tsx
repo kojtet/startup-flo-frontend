@@ -47,6 +47,10 @@ export default function LeadsInbox() {
     handleDeleteLead,
     handleConvertLead,
     resetFormData,
+    sortKey,
+    setSortKey,
+    sortDirection,
+    setSortDirection,
   } = useLeads();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -188,6 +192,10 @@ export default function LeadsInbox() {
           categoryFilter={categoryFilter}
           setCategoryFilter={setCategoryFilter}
           categories={categories}
+          sortKey={sortKey}
+          setSortKey={setSortKey}
+          sortDirection={sortDirection}
+          setSortDirection={setSortDirection}
         />
 
         {loading ? (

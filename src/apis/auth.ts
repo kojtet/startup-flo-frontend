@@ -6,7 +6,7 @@ export const auth = {
     try {
       const response = await api.post('/login', { username, password });
       return response.data;
-    } catch (error: AxiosError) {
+    } catch (error: unknown) {
       throw error;
     }
   },
@@ -24,7 +24,7 @@ export const auth = {
     try {
       const response = await api.post('/register', { username, password });
       return response.data;
-    } catch (error: AxiosError) {
+    } catch (error: unknown) {
       throw error;
     }
   },

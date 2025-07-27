@@ -14,7 +14,16 @@
 // CACHE UTILITIES
 // ================================
 
-import { CacheEntry, CacheConfig, CacheStats, CacheOperation, DEFAULT_CACHE_CONFIG } from './types';
+import { CacheEntry, CacheConfig, CacheStats, CacheOperation } from './types';
+
+// Default cache configuration
+const DEFAULT_CACHE_CONFIG: CacheConfig = {
+  maxSize: 100,
+  defaultTTL: 5 * 60 * 1000, // 5 minutes
+  cleanupInterval: 60 * 1000, // 1 minute
+  enablePersistence: true,
+  enableCompression: false,
+};
 
 /**
  * Advanced cache implementation with LRU eviction, persistence, and statistics

@@ -1,11 +1,11 @@
 /**
- * @fileoverview Main library exports for the Fihankra Safety Sentinel application.
+ * @fileoverview Main library exports for the StartupFlo application.
  * 
  * This file serves as the central export point for all enhanced types, utilities,
  * constants, and configurations used throughout the application. It provides a
  * clean and organized way to import all necessary functionality from the lib module.
  * 
- * @author Fihankra Safety Sentinel Team
+ * @author StartupFlo Team
  * @version 1.0.0
  * @since 2024
  */
@@ -20,8 +20,43 @@ export * from './types';
 // Utility functions
 export * from './utils';
 
-// Error handling utilities
-export * from './errorHandling';
+// Error handling utilities - export specific items to avoid conflicts
+export {
+  handleError,
+  withRetry,
+  createErrorBoundary,
+  useErrorHandler,
+  createErrorContext,
+  createStandardizedError,
+  detectErrorCategory,
+  createUserFriendlyMessage,
+  generateErrorCode,
+  extractStatusCode,
+  isRetryableError,
+  withRetryOperation,
+  logError,
+  reportError,
+  createErrorBoundaryState,
+  resetErrorBoundaryState,
+  validationResultToError,
+  LogLevel,
+  errorLogger,
+  ERROR_CATEGORIES,
+  ERROR_SEVERITY,
+  DEFAULT_ERROR_MESSAGES,
+  DEFAULT_RETRY_CONFIG
+} from './errorHandling';
+
+// Error handling types
+export type {
+  ErrorCategory,
+  ErrorContext,
+  ErrorHandlingResult,
+  RetryStrategy,
+  ErrorReport,
+  ErrorLogger,
+  ConsoleErrorLogger
+} from './errorHandling';
 
 // Cache utilities
 export * from './cache';
@@ -29,56 +64,69 @@ export * from './cache';
 // Form utilities
 export * from './formUtils';
 
-// Validation utilities
-export * from './validation';
+// Validation utilities - export specific items to avoid conflicts
+export {
+  validateEmail,
+  validatePhone,
+  validateUrl,
+  validatePassword,
+  validateUsername,
+  validateRequired,
+  validateMinLength,
+  validateMaxLength,
+  validateNumericRange,
+  validateDateRange,
+  validateFileSize,
+  validateFileType,
+  validateArrayLength,
+  validateUniqueValues,
+  validateObjectStructure,
+  validatePattern,
+  validateConditional,
+  combineValidationResults,
+  validateFormData,
+  createRequiredRule,
+  createEmailRule,
+  createPhoneRule,
+  createUrlRule,
+  createPasswordRule,
+  createUsernameRule,
+  createMinLengthRule,
+  createMaxLengthRule,
+  createNumericRangeRule,
+  createPatternRule,
+  formatValidationErrors,
+  hasValidationError,
+  getValidationError
+} from './validation';
 
-// Date utilities
-export * from './dateUtils';
+// Context composer utilities
+export * from './context-composer';
 
-// String utilities
-export * from './stringUtils';
+// Logger utilities
+export * from './logger';
 
-// Number utilities
-export * from './numberUtils';
+// Monitoring utilities
+export * from './monitoring';
 
-// Array utilities
-export * from './arrayUtils';
+// Pagination manager utilities - export specific items to avoid conflicts
+export {
+  usePagination,
+  PaginationManager
+} from './pagination-manager';
 
-// Object utilities
-export * from './objectUtils';
+// Pagination manager types
+export type {
+  PaginationState,
+  PaginationConfig,
+  PaginationParams,
+  PaginatedResponse,
+  UsePaginationOptions,
+  UsePaginationReturn
+} from './pagination-manager';
 
-// API utilities
-export * from './apiUtils';
-
-// Storage utilities
-export * from './storageUtils';
-
-// Theme utilities
-export * from './themeUtils';
-
-// Permission utilities
-export * from './permissionUtils';
-
-// Analytics utilities
-export * from './analyticsUtils';
-
-// Internationalization utilities
-export * from './i18nUtils';
-
-// Feature flag utilities
-export * from './featureFlagUtils';
-
-// WebSocket utilities
-export * from './websocketUtils';
-
-// Export/Import utilities
-export * from './exportImportUtils';
-
-// Audit utilities
-export * from './auditUtils';
-
-// Notification utilities
-export * from './notificationUtils';
+// Server-side filtering utilities
+export * from './server-side-filtering';
 
 // ================================
 // RE-EXPORTS FROM APIS
@@ -92,10 +140,10 @@ export * from '../apis/types';
 // ================================
 
 // Common constants
-export const APP_NAME = 'Fihankra Safety Sentinel';
+export const APP_NAME = 'StartupFlo';
 export const APP_VERSION = '1.0.0';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
+export const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_BASE_URL || 'ws://localhost:3000';
 
 // Common configurations
 export const DEFAULT_PAGINATION = {
@@ -315,4 +363,58 @@ export const FILTER_OPTIONS = {
     type: 'select',
     options: [], // Will be populated dynamically
   },
-} as const; 
+} as const;
+
+// ================================
+// COMMENTED OUT - NON-EXISTENT FILES
+// ================================
+
+// These files don't exist in the lib folder and are commented out:
+
+// Date utilities
+// export * from './dateUtils';
+
+// String utilities
+// export * from './stringUtils';
+
+// Number utilities
+// export * from './numberUtils';
+
+// Array utilities
+// export * from './arrayUtils';
+
+// Object utilities
+// export * from './objectUtils';
+
+// API utilities
+// export * from './apiUtils';
+
+// Storage utilities
+// export * from './storageUtils';
+
+// Theme utilities
+// export * from './themeUtils';
+
+// Permission utilities
+// export * from './permissionUtils';
+
+// Analytics utilities
+// export * from './analyticsUtils';
+
+// Internationalization utilities
+// export * from './i18nUtils';
+
+// Feature flag utilities
+// export * from './featureFlagUtils';
+
+// WebSocket utilities
+// export * from './websocketUtils';
+
+// Export/Import utilities
+// export * from './exportImportUtils';
+
+// Audit utilities
+// export * from './auditUtils';
+
+// Notification utilities
+// export * from './notificationUtils'; 

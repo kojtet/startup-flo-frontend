@@ -1,4 +1,4 @@
-import type { CacheConfig } from '@/hooks/useAdvancedCache';
+import type { CacheConfig } from '@/lib/types';
 
 // Cache duration constants (in milliseconds)
 export const CACHE_DURATIONS = {
@@ -28,11 +28,10 @@ export const CACHE_CONFIGS = {
   FINANCE: {
     budgets: {
       maxSize: CACHE_SIZES.MEDIUM,
-      maxAge: CACHE_DURATIONS.SEMI_STATIC,
-      persistToStorage: true,
-      storageKey: 'finance_budgets',
-      backgroundRefresh: true,
-      backgroundRefreshThreshold: 0.8,
+      defaultTTL: CACHE_DURATIONS.SEMI_STATIC,
+      cleanupInterval: 60 * 1000,
+      enablePersistence: true,
+      enableCompression: false,
     },
     transactions: {
       maxSize: CACHE_SIZES.LARGE,
@@ -237,11 +236,10 @@ export function getCacheConfig(
     // Default fallback configuration
     return {
       maxSize: CACHE_SIZES.MEDIUM,
-      maxAge: CACHE_DURATIONS.DYNAMIC,
-      persistToStorage: true,
-      storageKey: `${module}_${dataType}`,
-      backgroundRefresh: true,
-      backgroundRefreshThreshold: 0.7,
+      defaultTTL: CACHE_DURATIONS.DYNAMIC,
+      cleanupInterval: 60 * 1000,
+      enablePersistence: true,
+      enableCompression: false,
     };
   }
   

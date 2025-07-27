@@ -23,7 +23,8 @@ import {
   XCircle,
   CheckCircle
 } from 'lucide-react';
-import { AppError, ErrorSeverity } from '@/lib/types';
+import { AppError } from '@/lib/types';
+import { ErrorSeverity } from '@/apis/core/errors';
 import { ERROR_CATEGORIES, ERROR_SEVERITY } from '@/lib/errorHandling';
 
 // ================================
@@ -82,12 +83,12 @@ export const ErrorAlert: React.FC<ErrorDisplayProps> = ({
 }) => {
   const getSeverityIcon = (severity: ErrorSeverity) => {
     switch (severity) {
-      case 'CRITICAL':
-      case 'HIGH':
+      case ErrorSeverity.CRITICAL:
+      case ErrorSeverity.ERROR:
         return <XCircle className="h-4 w-4" />;
-      case 'MEDIUM':
+      case ErrorSeverity.WARNING:
         return <AlertTriangle className="h-4 w-4" />;
-      case 'LOW':
+      case ErrorSeverity.INFO:
         return <Info className="h-4 w-4" />;
       default:
         return <AlertCircle className="h-4 w-4" />;
@@ -95,7 +96,7 @@ export const ErrorAlert: React.FC<ErrorDisplayProps> = ({
   };
 
   const getSeverityVariant = (severity: ErrorSeverity): 'destructive' | 'default' => {
-    return severity === 'CRITICAL' || severity === 'HIGH' ? 'destructive' : 'default';
+    return severity === ErrorSeverity.CRITICAL || severity === ErrorSeverity.ERROR ? 'destructive' : 'default';
   };
 
   return (
@@ -187,13 +188,13 @@ export const ErrorCard: React.FC<ErrorDisplayProps> = ({
 }) => {
   const getSeverityColor = (severity: ErrorSeverity) => {
     switch (severity) {
-      case 'CRITICAL':
+      case ErrorSeverity.CRITICAL:
         return 'text-red-600 bg-red-50 border-red-200';
-      case 'HIGH':
+      case ErrorSeverity.ERROR:
         return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'MEDIUM':
+      case ErrorSeverity.WARNING:
         return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'LOW':
+      case ErrorSeverity.INFO:
         return 'text-blue-600 bg-blue-50 border-blue-200';
       default:
         return 'text-gray-600 bg-gray-50 border-gray-200';
@@ -213,7 +214,7 @@ export const ErrorCard: React.FC<ErrorDisplayProps> = ({
           
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={getSeverityColor(error.severity)}>
-              {ERROR_SEVERITY[error.severity]}
+              {error.severity.charAt(0).toUpperCase() + error.severity.slice(1)}
             </Badge>
             
             {showCode && (
@@ -449,15 +450,4 @@ export const ErrorBoundaryFallback: React.FC<{
   );
 };
 
-// ================================
-// EXPORTS
-// ================================
-
-export {
-  ErrorAlert,
-  ErrorCard,
-  InlineError,
-  SuccessMessage,
-  WarningMessage,
-  ErrorBoundaryFallback
-}; 
+ 

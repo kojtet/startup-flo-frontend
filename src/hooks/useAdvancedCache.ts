@@ -179,7 +179,7 @@ export class AdvancedCache<T = any> {
     const promises = entries.map(({ key, fetcher }) => 
       this.get(key, fetcher).catch(() => {
         // Silently fail for cache warming
-        logger.warn(`Failed to warm cache for key: ${key}`, {}, 'Cache');
+        console.warn(`Failed to warm cache for key: ${key}`);
       })
     );
     
@@ -220,7 +220,7 @@ export class AdvancedCache<T = any> {
       this.set(key, data);
     } catch (error) {
       // Silently fail for background refresh
-              logger.warn(`Background refresh failed for key: ${key}`, error, 'Cache');
+      console.warn(`Background refresh failed for key: ${key}`, error);
     }
   }
 
@@ -282,7 +282,7 @@ export class AdvancedCache<T = any> {
         JSON.stringify(data)
       );
     } catch (error) {
-      logger.warn('Failed to save cache to storage', error, 'Cache');
+      console.warn('Failed to save cache to storage', error);
     }
   }
 
@@ -302,7 +302,7 @@ export class AdvancedCache<T = any> {
         this.stats = data.stats;
       }
     } catch (error) {
-      logger.warn('Failed to load cache from storage', error, 'Cache');
+      console.warn('Failed to load cache from storage', error);
     }
   }
 

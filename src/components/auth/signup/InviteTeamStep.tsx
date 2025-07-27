@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { UserPlus, Mail, Trash2, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
 import { SignupData } from "../SignupFlow";
-import { SignupCredentials, User as ApiUser } from "@/apis/types";
+
 import { useAuth } from "@/contexts/AuthContext";
 
 interface InviteTeamStepProps {
@@ -48,7 +48,7 @@ export function InviteTeamStep({ data, updateData, onBack, isLoading, setIsLoadi
   const invites = data.invites.length === 0 ? dummyTeamMembers : data.invites;
 
   // Helper function to prepare signup payload matching backend requirements
-  const prepareSignupPayload = (): SignupCredentials => {
+  const prepareSignupPayload = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
       email: data.email?.trim(),
@@ -131,8 +131,8 @@ export function InviteTeamStep({ data, updateData, onBack, isLoading, setIsLoadi
       const payload = prepareSignupPayload();
       console.log("Sending signup payload:", JSON.stringify(payload, null, 2));
       
-      const signupResponse: ApiUser = await register(payload);
-      console.log("Signup successful, user:", signupResponse);
+      await register(payload);
+      console.log("Signup successful");
 
       // Step 2: Handle team invites (API not ready yet)
       if (invites.length > 0) {
@@ -173,8 +173,8 @@ export function InviteTeamStep({ data, updateData, onBack, isLoading, setIsLoadi
       const payload = prepareSignupPayload();
       console.log("Sending signup payload (skip invites):", JSON.stringify(payload, null, 2));
       
-      const signupResponse: ApiUser = await register(payload);
-      console.log("Signup successful, user:", signupResponse);
+      await register(payload);
+      console.log("Signup successful");
 
       router.push("/");
 

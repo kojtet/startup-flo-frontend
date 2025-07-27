@@ -25,6 +25,7 @@ export interface ErrorDetails {
   timestamp: string;
   url: string;
   userAgent: string;
+  level?: 'page' | 'section' | 'component' | 'context';
 }
 
 export interface ErrorBoundaryProps {

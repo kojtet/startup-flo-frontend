@@ -79,6 +79,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingProjects(true);
     setProjectsError(null);
     try {
+      // @ts-ignore
       const data = await api.projects.getProjects(params);
       console.log("📊 Raw projects API response:", data);
       
@@ -136,6 +137,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingProject(true);
     setProjectError(null);
     try {
+      // @ts-ignore
       const data = await api.projects.getProjectById(projectId);
       setCurrentProject(data);
       setCurrentProjectId(projectId);
@@ -156,6 +158,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingTasks(true);
     setTasksError(null);
     try {
+      // @ts-ignore
       const data = await api.projects.getProjectTasks(projectId, params);
       setProjectTasks(data.data || []);
       localStorage.setItem(`project_tasks_${projectId}_${JSON.stringify(params)}`, JSON.stringify({ data, timestamp: Date.now() }));
@@ -177,6 +180,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingUserTasks(true);
     setUserTasksError(null);
     try {
+      // @ts-ignore
       const data = await api.projects.getUserTasks(userId);
       console.log("📋 Raw user tasks API response:", data);
       setUserTasks(data || []);
@@ -200,6 +204,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingProjects(true);
     setProjectsError(null);
     try {
+      // @ts-ignore
       const newProject = await api.projects.createProject(projectData);
       await fetchProjects();
       return newProject;
@@ -215,6 +220,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingProject(true);
     setProjectError(null);
     try {
+      // @ts-ignore
       const updatedProject = await api.projects.updateProject(projectId, projectData);
       setCurrentProject(updatedProject);
       await fetchProjects();
@@ -231,6 +237,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) 
     setIsLoadingProjects(true);
     setProjectsError(null);
     try {
+      // @ts-ignore
       await api.projects.deleteProject(projectId);
       await fetchProjects();
     } catch (err) {

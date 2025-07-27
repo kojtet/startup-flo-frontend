@@ -1,10 +1,19 @@
 import { useState, useCallback, useRef } from 'react';
-import { 
-  createBatchRequestManager, 
-  type BatchRequestConfig, 
-  type BatchRequestResult,
-  type BatchRequestManager 
-} from '@/apis';
+import { api } from '@/apis';
+
+// Define the missing types locally
+interface BatchRequestConfig {
+  concurrency?: number;
+  timeout?: number;
+  retries?: number;
+}
+
+interface BatchRequestResult<T> {
+  success: boolean;
+  data?: T;
+  error?: Error;
+  index: number;
+}
 
 interface UseBatchRequestsOptions {
   config?: BatchRequestConfig;
@@ -26,20 +35,10 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
     progress: { completed: 0, total: 0 },
   });
 
-  const managerRef = useRef<BatchRequestManager | null>(null);
-
   const executeBatch = useCallback(async (
     requests: (() => Promise<T>)[],
     customConfig?: BatchRequestConfig
   ) => {
-    if (!managerRef.current) {
-      managerRef.current = createBatchRequestManager(
-        // We'll need to import the apiClient instance
-        (await import('@/apis')).apiClient,
-        { ...options.config, ...customConfig }
-      );
-    }
-
     setState(prev => ({
       ...prev,
       loading: true,
@@ -48,15 +47,28 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
     }));
 
     try {
-      const handleProgress = (completed: number, total: number) => {
+      const results: BatchRequestResult<T>[] = [];
+      let completed = 0;
+
+      for (let i = 0; i < requests.length; i++) {
+        try {
+          const data = await requests[i]();
+          results.push({ success: true, data, index: i });
+        } catch (error) {
+          results.push({ 
+            success: false, 
+            error: error instanceof Error ? error : new Error(String(error)), 
+            index: i 
+          });
+        }
+        
+        completed++;
         setState(prev => ({
           ...prev,
-          progress: { completed, total },
+          progress: { completed, total: requests.length },
         }));
-        options.onProgress?.(completed, total);
-      };
-
-      const results = await managerRef.current.executeBatch(requests, handleProgress);
+        options.onProgress?.(completed, requests.length);
+      }
 
       setState(prev => ({
         ...prev,
@@ -75,20 +87,13 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
       }));
       throw errorObj;
     }
-  }, [options.config, options.onProgress]);
+  }, [options.onProgress]);
 
   const executeBatchGet = useCallback(async (
     endpoints: string[],
     config?: any,
     customConfig?: BatchRequestConfig
   ) => {
-    if (!managerRef.current) {
-      managerRef.current = createBatchRequestManager(
-        (await import('@/apis')).apiClient,
-        { ...options.config, ...customConfig }
-      );
-    }
-
     setState(prev => ({
       ...prev,
       loading: true,
@@ -97,15 +102,28 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
     }));
 
     try {
-      const handleProgress = (completed: number, total: number) => {
+      const results: BatchRequestResult<T>[] = [];
+      let completed = 0;
+
+      for (let i = 0; i < endpoints.length; i++) {
+        try {
+          const response = await api.get(endpoints[i], config);
+          results.push({ success: true, data: response.data, index: i });
+        } catch (error) {
+          results.push({ 
+            success: false, 
+            error: error instanceof Error ? error : new Error(String(error)), 
+            index: i 
+          });
+        }
+        
+        completed++;
         setState(prev => ({
           ...prev,
-          progress: { completed, total },
+          progress: { completed, total: endpoints.length },
         }));
-        options.onProgress?.(completed, total);
-      };
-
-      const results = await managerRef.current.batchGet<T>(endpoints, config, handleProgress);
+        options.onProgress?.(completed, endpoints.length);
+      }
 
       setState(prev => ({
         ...prev,
@@ -124,19 +142,12 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
       }));
       throw errorObj;
     }
-  }, [options.config, options.onProgress]);
+  }, [options.onProgress]);
 
   const executeBatchPost = useCallback(async (
     requests: Array<{ endpoint: string; data?: any; config?: any }>,
     customConfig?: BatchRequestConfig
   ) => {
-    if (!managerRef.current) {
-      managerRef.current = createBatchRequestManager(
-        (await import('@/apis')).apiClient,
-        { ...options.config, ...customConfig }
-      );
-    }
-
     setState(prev => ({
       ...prev,
       loading: true,
@@ -145,15 +156,29 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
     }));
 
     try {
-      const handleProgress = (completed: number, total: number) => {
+      const results: BatchRequestResult<T>[] = [];
+      let completed = 0;
+
+      for (let i = 0; i < requests.length; i++) {
+        try {
+          const { endpoint, data, config } = requests[i];
+          const response = await api.post(endpoint, data, config);
+          results.push({ success: true, data: response.data, index: i });
+        } catch (error) {
+          results.push({ 
+            success: false, 
+            error: error instanceof Error ? error : new Error(String(error)), 
+            index: i 
+          });
+        }
+        
+        completed++;
         setState(prev => ({
           ...prev,
-          progress: { completed, total },
+          progress: { completed, total: requests.length },
         }));
-        options.onProgress?.(completed, total);
-      };
-
-      const results = await managerRef.current.batchPost<T>(requests, handleProgress);
+        options.onProgress?.(completed, requests.length);
+      }
 
       setState(prev => ({
         ...prev,
@@ -172,7 +197,7 @@ export const useBatchRequests = <T = any>(options: UseBatchRequestsOptions = {})
       }));
       throw errorObj;
     }
-  }, [options.config, options.onProgress]);
+  }, [options.onProgress]);
 
   const reset = useCallback(() => {
     setState({

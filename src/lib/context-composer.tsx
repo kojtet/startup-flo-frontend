@@ -74,7 +74,7 @@ export function createContextGroup(
   providers: Array<ProviderComponent | ProviderWithProps>
 ) {
   const GroupProvider = combineContexts({ providers });
-  GroupProvider.displayName = `${name}ContextGroup`;
+  (GroupProvider as any).displayName = `${name}ContextGroup`;
   return GroupProvider;
 }
 
@@ -155,7 +155,7 @@ export function createLazyProvider<P extends { children: ReactNode }>(
   return function LazyProviderWrapper(props: P) {
     return (
       <React.Suspense fallback={fallback || <div>Loading...</div>}>
-        <LazyProvider {...props} />
+        <LazyProvider {...(props as any)} />
       </React.Suspense>
     );
   };

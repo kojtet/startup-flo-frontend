@@ -118,7 +118,7 @@ export class AssetsService {
   async getAsset(id: string, config?: ApiConfigOverride): Promise<Asset> {
     try {
       const response = await this.apiClient.get<AssetResponse>(ASSETS_ENDPOINTS.ASSET_DETAIL(id), config);
-      return response.data.asset;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -153,7 +153,7 @@ export class AssetsService {
   async createAsset(data: CreateAssetData, config?: ApiConfigOverride): Promise<Asset> {
     try {
       const response = await this.apiClient.post<AssetResponse>(ASSETS_ENDPOINTS.ASSETS_LIST, data, config);
-      return response.data.asset;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -179,7 +179,7 @@ export class AssetsService {
   async updateAsset(id: string, data: UpdateAssetData, config?: ApiConfigOverride): Promise<Asset> {
     try {
       const response = await this.apiClient.put<AssetResponse>(ASSETS_ENDPOINTS.ASSET_DETAIL(id), data, config);
-      return response.data.asset;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -234,7 +234,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.assignment;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -264,7 +264,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.assignment;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -294,7 +294,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.assignment;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -314,11 +314,11 @@ export class AssetsService {
    */
   async getAssetAssignmentHistory(assetId: string, config?: ApiConfigOverride): Promise<AssetAssignment[]> {
     try {
-      const response = await this.apiClient.get<AssetAssignment[]>(
+      const response = await this.apiClient.get<AssetAssignmentsResponse>(
         ASSETS_ENDPOINTS.ASSET_ASSIGNMENTS(assetId), 
         config
       );
-      return response.data;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -342,11 +342,11 @@ export class AssetsService {
    */
   async getAssetMaintenance(assetId: string, config?: ApiConfigOverride): Promise<AssetMaintenance[]> {
     try {
-      const response = await this.apiClient.get<AssetMaintenanceResponse>(
+      const response = await this.apiClient.get<MaintenanceResponse>(
         ASSETS_ENDPOINTS.ASSET_MAINTENANCE(assetId), 
         config
       );
-      return response.data.maintenance;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -372,12 +372,12 @@ export class AssetsService {
    */
   async scheduleMaintenance(data: CreateMaintenanceData, config?: ApiConfigOverride): Promise<AssetMaintenance> {
     try {
-      const response = await this.apiClient.post<MaintenanceResponse>(
+      const response = await this.apiClient.post<AssetMaintenanceResponse>(
         ASSETS_ENDPOINTS.ASSET_MAINTENANCE(""), 
         data, 
         config
       );
-      return response.data.maintenance;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -401,12 +401,12 @@ export class AssetsService {
    */
   async updateMaintenance(maintenanceId: string, data: UpdateMaintenanceData, config?: ApiConfigOverride): Promise<AssetMaintenance> {
     try {
-      const response = await this.apiClient.put<MaintenanceResponse>(
+      const response = await this.apiClient.put<AssetMaintenanceResponse>(
         ASSETS_ENDPOINTS.ASSET_MAINTENANCE_DETAIL(maintenanceId), 
         data, 
         config
       );
-      return response.data.maintenance;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -432,12 +432,12 @@ export class AssetsService {
    */
   async completeMaintenance(maintenanceId: string, data: CompleteMaintenanceData, config?: ApiConfigOverride): Promise<AssetMaintenance> {
     try {
-      const response = await this.apiClient.post<MaintenanceResponse>(
+      const response = await this.apiClient.post<AssetMaintenanceResponse>(
         ASSETS_ENDPOINTS.ASSET_MAINTENANCE_COMPLETE(maintenanceId), 
         data, 
         config
       );
-      return response.data.maintenance;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -472,7 +472,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.checkout;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -501,7 +501,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.checkout;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -525,7 +525,7 @@ export class AssetsService {
         ASSETS_ENDPOINTS.ASSET_CHECKOUT(assetId), 
         config
       );
-      return response.data.checkouts;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -548,8 +548,8 @@ export class AssetsService {
    */
   async getAssetCategories(config?: ApiConfigOverride): Promise<AssetCategory[]> {
     try {
-      const response = await this.apiClient.get<AssetCategory[]>(ASSETS_ENDPOINTS.ASSET_CATEGORIES_LIST, config);
-      return response.data;
+      const response = await this.apiClient.get<AssetCategoriesResponse>(ASSETS_ENDPOINTS.ASSET_CATEGORIES_LIST, config);
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -576,7 +576,7 @@ export class AssetsService {
   async createAssetCategory(data: CreateAssetCategoryData, config?: ApiConfigOverride): Promise<AssetCategory> {
     try {
       const response = await this.apiClient.post<AssetCategoryResponse>(ASSETS_ENDPOINTS.ASSET_CATEGORIES, data, config);
-      return response.data.category;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -605,7 +605,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.category;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -649,7 +649,7 @@ export class AssetsService {
   async getAssetLocations(config?: ApiConfigOverride): Promise<AssetLocation[]> {
     try {
       const response = await this.apiClient.get<AssetLocationsResponse>(ASSETS_ENDPOINTS.ASSET_LOCATIONS, config);
-      return response.data.locations;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -676,7 +676,7 @@ export class AssetsService {
   async createAssetLocation(data: CreateAssetLocationData, config?: ApiConfigOverride): Promise<AssetLocation> {
     try {
       const response = await this.apiClient.post<AssetLocationResponse>(ASSETS_ENDPOINTS.ASSET_LOCATIONS, data, config);
-      return response.data.location;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -705,7 +705,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.location;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -759,7 +759,7 @@ export class AssetsService {
         data, 
         config
       );
-      return response.data.asset;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -914,7 +914,7 @@ export class AssetsService {
         ASSETS_ENDPOINTS.ASSET_AUDIT_LOG(assetId), 
         config
       );
-      return response.data.audit_trail;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }

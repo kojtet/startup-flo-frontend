@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 // ================================
 // ERROR BOUNDARY HOOKS
@@ -182,7 +182,15 @@ export interface UseSafeAsyncOptions {
 // Hook for safely executing async operations with automatic error handling
 export function useSafeAsync<T>(options: UseSafeAsyncOptions = {}) {
   const { fallbackValue = null, onError, shouldRetry, maxRetries = 3 } = options;
-  const { captureError } = useErrorBoundary({ onError });
+  
+  // Create a wrapper for onError to match the ErrorInfo interface
+  const wrappedOnError = useCallback((errorInfo: ErrorInfo) => {
+    if (onError) {
+      onError(errorInfo.error);
+    }
+  }, [onError]);
+  
+  const { captureError } = useErrorBoundary({ onError: wrappedOnError });
 
   const safeExecute = useCallback(async (
     asyncFn: () => Promise<T>,

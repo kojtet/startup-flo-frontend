@@ -10,6 +10,8 @@
  * @since 2024
  */
 
+import { ErrorSeverity } from '@/apis/core/errors';
+
 // ================================
 // CONTEXT STATE INTERFACES
 // ================================
@@ -487,7 +489,7 @@ export interface AppError extends Error {
   /** Whether the operation can be retried */
   retryable?: boolean;
   /** Error severity level for prioritization */
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: ErrorSeverity;
 }
 
 export interface ErrorBoundaryState {
@@ -1145,7 +1147,6 @@ export type {
   AssetLocation,
   Vendor,
   VendorCategory,
-  Transfer,
   Campaign,
   Activity,
   Note,

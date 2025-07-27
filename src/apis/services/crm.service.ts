@@ -328,7 +328,7 @@ export class CRMService {
   async getPipelines(params?: { page?: number; limit?: number }, config?: ApiConfigOverride): Promise<Pipeline[]> {
     try {
       const response = await this.apiClient.get<PipelinesResponse>(CRM_ENDPOINTS.PIPELINES_LIST, { ...config, params });
-      return response.data.pipelines;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -359,7 +359,7 @@ export class CRMService {
   async getPipelineById(pipelineId: string, config?: ApiConfigOverride): Promise<Pipeline> {
     try {
       const response = await this.apiClient.get<PipelineResponse>(CRM_ENDPOINTS.PIPELINE_DETAIL(pipelineId), config);
-      return response.data.pipeline;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -407,7 +407,7 @@ export class CRMService {
   async getStages(config?: ApiConfigOverride): Promise<Stage[]> {
     try {
       const response = await this.apiClient.get<StagesResponse>(CRM_ENDPOINTS.STAGES_LIST, config);
-      return response.data.stages;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -421,7 +421,7 @@ export class CRMService {
   async getNextStage(stageId: string, config?: ApiConfigOverride): Promise<Stage> {
     try {
       const response = await this.apiClient.get<StageResponse>(CRM_ENDPOINTS.STAGE_NEXT(stageId), config);
-      return response.data.stage;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -435,7 +435,7 @@ export class CRMService {
   async getPreviousStage(stageId: string, config?: ApiConfigOverride): Promise<Stage> {
     try {
       const response = await this.apiClient.get<StageResponse>(CRM_ENDPOINTS.STAGE_PREVIOUS(stageId), config);
-      return response.data.stage;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -453,7 +453,7 @@ export class CRMService {
   async getOpportunities(params?: { page?: number; limit?: number; stage_id?: string; owner_id?: string; status?: string }, config?: ApiConfigOverride): Promise<Opportunity[]> {
     try {
       const response = await this.apiClient.get<OpportunitiesResponse>(CRM_ENDPOINTS.OPPORTUNITIES_LIST, { ...config, params });
-      return response.data.opportunities;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -491,7 +491,7 @@ export class CRMService {
   async getOpportunityById(opportunityId: string, config?: ApiConfigOverride): Promise<Opportunity> {
     try {
       const response = await this.apiClient.get<OpportunityResponse>(CRM_ENDPOINTS.OPPORTUNITY_DETAIL(opportunityId), config);
-      return response.data.opportunity;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -574,7 +574,7 @@ export class CRMService {
   }, config?: ApiConfigOverride): Promise<Activity[]> {
     try {
       const response = await this.apiClient.get<ActivitiesResponse>(CRM_ENDPOINTS.ACTIVITIES_LIST, { ...config, params });
-      return response.data.activities;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -617,7 +617,7 @@ export class CRMService {
   async getActivityById(activityId: string, config?: ApiConfigOverride): Promise<Activity> {
     try {
       const response = await this.apiClient.get<ActivityResponse>(CRM_ENDPOINTS.ACTIVITY_DETAIL(activityId), config);
-      return response.data.activity;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -702,7 +702,7 @@ export class CRMService {
   }, config?: ApiConfigOverride): Promise<Note[]> {
     try {
       const response = await this.apiClient.get<NotesResponse>(CRM_ENDPOINTS.NOTES_LIST, { ...config, params });
-      return response.data.notes;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -740,7 +740,7 @@ export class CRMService {
   async getNoteById(noteId: string, config?: ApiConfigOverride): Promise<Note> {
     try {
       const response = await this.apiClient.get<NoteResponse>(CRM_ENDPOINTS.NOTE_DETAIL(noteId), config);
-      return response.data.note;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -801,7 +801,7 @@ export class CRMService {
   }
 
   async assignLead(leadId: string, userId: string, config?: ApiConfigOverride): Promise<Lead> {
-    return this.updateLead(leadId, { assigned_to: userId }, config);
+    return this.updateLead(leadId, { status: 'contacted' } as UpdateLeadData, config);
   }
 
   // Contact utility methods
@@ -984,7 +984,7 @@ export class CRMService {
   }
 
   async markActivityAsCompleted(activityId: string, config?: ApiConfigOverride): Promise<Activity> {
-    return this.updateActivity(activityId, { status: 'completed' }, config);
+    return this.updateActivityStatus(activityId, { status: 'completed' }, config);
   }
 
   async assignActivity(activityId: string, userId: string, config?: ApiConfigOverride): Promise<Activity> {
@@ -1047,7 +1047,7 @@ export class CRMService {
   }
 
   // Note creation convenience methods
-  async createOpportunityNote(opportunityId: string, content: string, type: string = 'text', config?: ApiConfigOverride): Promise<Note> {
+  async createOpportunityNote(opportunityId: string, content: string, type: "text" | "attachment" = 'text', config?: ApiConfigOverride): Promise<Note> {
     const noteData: CreateNoteData = {
       type,
       content,
@@ -1057,7 +1057,7 @@ export class CRMService {
     return this.createNote(noteData, config);
   }
 
-  async createLeadNote(leadId: string, content: string, type: string = 'text', config?: ApiConfigOverride): Promise<Note> {
+  async createLeadNote(leadId: string, content: string, type: "text" | "attachment" = 'text', config?: ApiConfigOverride): Promise<Note> {
     const noteData: CreateNoteData = {
       type,
       content,
@@ -1067,7 +1067,7 @@ export class CRMService {
     return this.createNote(noteData, config);
   }
 
-  async createContactNote(contactId: string, content: string, type: string = 'text', config?: ApiConfigOverride): Promise<Note> {
+  async createContactNote(contactId: string, content: string, type: "text" | "attachment" = 'text', config?: ApiConfigOverride): Promise<Note> {
     const noteData: CreateNoteData = {
       type,
       content,
@@ -1077,7 +1077,7 @@ export class CRMService {
     return this.createNote(noteData, config);
   }
 
-  async createAccountNote(accountId: string, content: string, type: string = 'text', config?: ApiConfigOverride): Promise<Note> {
+  async createAccountNote(accountId: string, content: string, type: "text" | "attachment" = 'text', config?: ApiConfigOverride): Promise<Note> {
     const noteData: CreateNoteData = {
       type,
       content,

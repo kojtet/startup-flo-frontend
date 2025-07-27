@@ -59,11 +59,37 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
 
   const { isAuthenticated } = useAuth();
 
+  // Helper function to safely call company service methods with fallback
+  const callCompanyService = useCallback(<T,>(
+    serviceMethod: () => Promise<T>,
+    fallbackMethod: () => Promise<T>
+  ): Promise<T> => {
+    try {
+      // Try to use the company service if it exists
+      if ((api as any).company && typeof (api as any).company.getCompanyDetails === 'function') {
+        return serviceMethod();
+      }
+    } catch (error) {
+      console.warn('Company service not available, falling back to direct API calls');
+    }
+    
+    // Fallback to direct API calls
+    return fallbackMethod();
+  }, []);
+
   const fetchCompany = useCallback(async (companyId: string) => {
     setIsLoadingCompany(true);
     setCompanyError(null);
     try {
-      const data = await api.company.getCompanyDetails(companyId);
+      const data = await callCompanyService(
+        // Service method
+        () => (api as any).company.getCompanyDetails(companyId),
+        // Fallback method
+        async () => {
+          const response = await api.get(`/companies/${companyId}`);
+          return response.data.company || response.data;
+        }
+      );
       setCompany(data);
       localStorage.setItem(`company_${companyId}`, JSON.stringify({ data, timestamp: Date.now() }));
     } catch (err) {
@@ -75,13 +101,21 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
     } finally {
       setIsLoadingCompany(false);
     }
-  }, []);
+  }, [callCompanyService]);
 
   const fetchCompanyMembers = useCallback(async (companyId: string, params?: PaginationParams) => {
     setIsLoadingMembers(true);
     setMembersError(null);
     try {
-      const data = await api.company.getCompanyMembers(companyId, params);
+      const data = await callCompanyService(
+        // Service method
+        () => (api as any).company.getCompanyMembers(companyId, params),
+        // Fallback method
+        async () => {
+          const response = await api.get(`/companies/members/${companyId}`, { params });
+          return response.data;
+        }
+      );
       setCompanyMembers(data.data);
       setMembersPagination({
         page: data.meta.currentPage,
@@ -99,13 +133,21 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
     } finally {
       setIsLoadingMembers(false);
     }
-  }, []);
+  }, [callCompanyService]);
 
   const updateCompany = useCallback(async (companyId: string, companyData: UpdateCompanyData): Promise<Company> => {
     setIsLoadingCompany(true);
     setCompanyError(null);
     try {
-      const updatedCompany = await api.company.updateCompanyDetails(companyId, companyData);
+      const updatedCompany = await callCompanyService(
+        // Service method
+        () => (api as any).company.updateCompanyDetails(companyId, companyData),
+        // Fallback method
+        async () => {
+          const response = await api.patch(`/companies/${companyId}`, companyData);
+          return response.data.company || response.data;
+        }
+      );
       setCompany(updatedCompany);
       localStorage.setItem(`company_${companyId}`, JSON.stringify({ data: updatedCompany, timestamp: Date.now() }));
       return updatedCompany;
@@ -115,7 +157,7 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
     } finally {
       setIsLoadingCompany(false);
     }
-  }, []);
+  }, [callCompanyService]);
 
   const clearCompanyCache = useCallback(() => {
     setCompany(null);

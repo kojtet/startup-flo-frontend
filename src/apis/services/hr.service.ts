@@ -698,8 +698,7 @@ export class HRService {
       start_date: startDate,
       end_date: endDate,
       leave_type: leaveType,
-      reason,
-      status: 'pending'
+      reason
     };
     return this.createLeaveRequest(data, config);
   }

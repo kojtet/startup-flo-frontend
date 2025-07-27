@@ -17,14 +17,13 @@ import {
   ValidationResult,
   ErrorBoundaryState,
   ErrorHandlerConfig,
-  RetryStrategy,
-  ErrorCategory,
-  ErrorSeverity,
-  ErrorContext,
-  ErrorReport,
-  isAppError,
-  createAppError
+  isAppError
 } from './types';
+import { 
+  ErrorSeverity, 
+  ApiError, 
+  handleApiError 
+} from '@/apis/core/errors';
 
 // Error categories for different types of operations
 export enum ErrorCategory {
@@ -55,6 +54,30 @@ export interface ErrorHandlingResult {
   shouldLog: boolean;
   severity: ErrorSeverity;
   category: ErrorCategory;
+}
+
+// Retry strategy interface
+export interface RetryStrategy {
+  maxAttempts: number;
+  baseDelay: number;
+  maxDelay: number;
+  backoffMultiplier: number;
+  retryableErrors: string[];
+}
+
+// Error report interface
+export interface ErrorReport {
+  error: {
+    code: string;
+    message: string;
+    userFriendlyMessage?: string;
+    category?: string;
+    severity: ErrorSeverity;
+    retryable?: boolean;
+    timestamp: string;
+    stack?: string;
+  };
+  context?: ErrorContext;
 }
 
 // User-friendly error messages
@@ -216,7 +239,9 @@ export function handleError(
   
   // Determine retry strategy
   const shouldRetry = strategy.shouldRetry;
-  const retryDelay = shouldRetry ? calculateRetryDelay(strategy, 0) : undefined;
+  const retryDelay = shouldRetry && 'baseDelay' in strategy && 'maxDelay' in strategy 
+    ? calculateRetryDelay(strategy, 0) 
+    : undefined;
   
   // Determine logging level
   const shouldLog = shouldLogError(apiError, category);
@@ -290,7 +315,7 @@ function getUserMessage(
 
 // Get specific message based on error code
 function getSpecificMessage(error: ApiError, category: ErrorCategory): string | null {
-  const messages = USER_MESSAGES[category];
+  const messages = USER_MESSAGES[category] as any;
   
   switch (error.errorCode) {
     case 'SESSION_EXPIRED':
@@ -330,11 +355,10 @@ function getSpecificMessage(error: ApiError, category: ErrorCategory): string | 
 }
 
 // Calculate retry delay with exponential backoff
-function calculateRetryDelay(strategy: typeof RETRY_STRATEGIES[keyof typeof RETRY_STRATEGIES], attempt: number): number {
-  if (!strategy.baseDelay || !strategy.maxDelay) {
-    return 0;
-  }
-  
+function calculateRetryDelay(
+  strategy: { baseDelay: number; maxDelay: number }, 
+  attempt: number
+): number {
   const delay = Math.min(
     strategy.baseDelay * Math.pow(2, attempt),
     strategy.maxDelay
@@ -416,7 +440,7 @@ export async function withRetry<T>(
       
       // Wait before retrying
       const delay = calculateRetryDelay(
-        { shouldRetry: true, maxRetries, baseDelay, maxDelay: baseDelay * 10 },
+        { baseDelay, maxDelay: baseDelay * 10 },
         attempt
       );
       
@@ -474,48 +498,7 @@ export function createErrorBoundary(
   };
 }
 
-// Hook for error handling in components
-export function useErrorHandler() {
-  const handleErrorInComponent = useCallback((
-    error: unknown,
-    operation: string,
-    module: string,
-    customMessages?: Record<string, string>
-  ) => {
-    const context: ErrorContext = {
-      operation,
-      module,
-      timestamp: Date.now(),
-    };
-    
-    return handleError(error, context, customMessages);
-  }, []);
 
-  const withErrorHandling = useCallback(<T extends any[], R>(
-    operation: (...args: T) => Promise<R>,
-    operationName: string,
-    module: string,
-    customMessages?: Record<string, string>
-  ) => {
-    return async (...args: T): Promise<R> => {
-      try {
-        return await operation(...args);
-      } catch (error) {
-        const result = handleErrorInComponent(error, operationName, module, customMessages);
-        
-        // Re-throw with user-friendly message
-        const enhancedError = new Error(result.userMessage);
-        enhancedError.cause = error;
-        throw enhancedError;
-      }
-    };
-  }, [handleErrorInComponent]);
-
-  return {
-    handleError: handleErrorInComponent,
-    withErrorHandling,
-  };
-}
 
 // Utility for creating error contexts
 export function createErrorContext(
@@ -531,9 +514,6 @@ export function createErrorContext(
   };
 }
 
-// Export types for use in other modules
-export type { ErrorContext, ErrorHandlingResult };
-
 // ================================
 // ERROR CATEGORIES AND SEVERITY
 // ================================
@@ -542,42 +522,38 @@ export type { ErrorContext, ErrorHandlingResult };
  * Error categories for different types of errors
  */
 export const ERROR_CATEGORIES: Record<ErrorCategory, string> = {
-  NETWORK: 'Network Error',
-  VALIDATION: 'Validation Error',
-  AUTHENTICATION: 'Authentication Error',
-  AUTHORIZATION: 'Authorization Error',
-  NOT_FOUND: 'Not Found Error',
-  SERVER: 'Server Error',
-  CLIENT: 'Client Error',
-  TIMEOUT: 'Timeout Error',
-  RATE_LIMIT: 'Rate Limit Error',
-  UNKNOWN: 'Unknown Error'
+  [ErrorCategory.NETWORK]: 'Network Error',
+  [ErrorCategory.VALIDATION]: 'Validation Error',
+  [ErrorCategory.AUTHENTICATION]: 'Authentication Error',
+  [ErrorCategory.AUTHORIZATION]: 'Authorization Error',
+  [ErrorCategory.NOT_FOUND]: 'Not Found Error',
+  [ErrorCategory.SERVER]: 'Server Error',
+  [ErrorCategory.CONFLICT]: 'Conflict Error',
+  [ErrorCategory.UNKNOWN]: 'Unknown Error'
 };
 
 /**
  * Error severity levels with descriptions
  */
 export const ERROR_SEVERITY: Record<ErrorSeverity, string> = {
-  LOW: 'Low',
-  MEDIUM: 'Medium',
-  HIGH: 'High',
-  CRITICAL: 'Critical'
+  [ErrorSeverity.INFO]: 'Info',
+  [ErrorSeverity.WARNING]: 'Warning',
+  [ErrorSeverity.ERROR]: 'Error',
+  [ErrorSeverity.CRITICAL]: 'Critical'
 };
 
 /**
  * Default error messages for common scenarios
  */
 export const DEFAULT_ERROR_MESSAGES: Record<ErrorCategory, string> = {
-  NETWORK: 'Unable to connect to the server. Please check your internet connection and try again.',
-  VALIDATION: 'Please check your input and try again.',
-  AUTHENTICATION: 'Your session has expired. Please log in again.',
-  AUTHORIZATION: 'You do not have permission to perform this action.',
-  NOT_FOUND: 'The requested resource was not found.',
-  SERVER: 'An unexpected error occurred on the server. Please try again later.',
-  CLIENT: 'An error occurred while processing your request.',
-  TIMEOUT: 'The request timed out. Please try again.',
-  RATE_LIMIT: 'Too many requests. Please wait a moment and try again.',
-  UNKNOWN: 'An unexpected error occurred. Please try again.'
+  [ErrorCategory.NETWORK]: 'Unable to connect to the server. Please check your internet connection and try again.',
+  [ErrorCategory.VALIDATION]: 'Please check your input and try again.',
+  [ErrorCategory.AUTHENTICATION]: 'Your session has expired. Please log in again.',
+  [ErrorCategory.AUTHORIZATION]: 'You do not have permission to perform this action.',
+  [ErrorCategory.NOT_FOUND]: 'The requested resource was not found.',
+  [ErrorCategory.SERVER]: 'An unexpected error occurred on the server. Please try again later.',
+  [ErrorCategory.CONFLICT]: 'This action conflicts with the current state.',
+  [ErrorCategory.UNKNOWN]: 'An unexpected error occurred. Please try again.'
 };
 
 // ================================
@@ -590,7 +566,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCategory, string> = {
  * @param error - The original error object
  * @param context - Additional context information
  * @param category - Error category (auto-detected if not provided)
- * @param severity - Error severity (defaults to MEDIUM)
+ * @param severity - Error severity (defaults to ERROR)
  * @returns Standardized AppError object
  * 
  * @example
@@ -610,7 +586,7 @@ export function createStandardizedError(
   error: any,
   context?: ErrorContext,
   category?: ErrorCategory,
-  severity: ErrorSeverity = 'MEDIUM'
+  severity: ErrorSeverity = ErrorSeverity.ERROR
 ): AppError {
   // If it's already an AppError, return it
   if (isAppError(error)) {
@@ -626,21 +602,23 @@ export function createStandardizedError(
   const userFriendlyMessage = createUserFriendlyMessage(error, category);
 
   // Create standardized error
-  return createAppError(error, {
+  return {
+    name: error.name || 'AppError',
+    message: error.message || 'An error occurred',
     code: generateErrorCode(category, context),
     statusCode: extractStatusCode(error),
     context: {
       ...context,
       originalError: error.message || error.toString(),
       timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
+      userAgent: typeof window !== 'undefined' ? navigator.userAgent : undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined
     },
     timestamp: new Date().toISOString(),
     userFriendlyMessage,
     retryable: isRetryableError(category, error),
     severity
-  });
+  };
 }
 
 /**
@@ -650,7 +628,7 @@ export function createStandardizedError(
  * @returns Detected error category
  */
 export function detectErrorCategory(error: any): ErrorCategory {
-  if (!error) return 'UNKNOWN';
+  if (!error) return ErrorCategory.UNKNOWN;
 
   const message = error.message?.toLowerCase() || '';
   const name = error.name?.toLowerCase() || '';
@@ -659,44 +637,44 @@ export function detectErrorCategory(error: any): ErrorCategory {
   // Network errors
   if (message.includes('network') || message.includes('fetch') || 
       message.includes('connection') || name.includes('network')) {
-    return 'NETWORK';
+    return ErrorCategory.NETWORK;
   }
 
   // HTTP status-based categorization
   if (status) {
-    if (status === 401) return 'AUTHENTICATION';
-    if (status === 403) return 'AUTHORIZATION';
-    if (status === 404) return 'NOT_FOUND';
-    if (status === 422) return 'VALIDATION';
-    if (status === 429) return 'RATE_LIMIT';
-    if (status >= 500) return 'SERVER';
-    if (status >= 400) return 'CLIENT';
+    if (status === 401) return ErrorCategory.AUTHENTICATION;
+    if (status === 403) return ErrorCategory.AUTHORIZATION;
+    if (status === 404) return ErrorCategory.NOT_FOUND;
+    if (status === 422) return ErrorCategory.VALIDATION;
+    if (status === 409) return ErrorCategory.CONFLICT;
+    if (status >= 500) return ErrorCategory.SERVER;
+    if (status >= 400) return ErrorCategory.VALIDATION;
   }
 
   // Validation errors
   if (message.includes('validation') || message.includes('invalid') ||
       name.includes('validation')) {
-    return 'VALIDATION';
+    return ErrorCategory.VALIDATION;
   }
 
   // Timeout errors
   if (message.includes('timeout') || name.includes('timeout')) {
-    return 'TIMEOUT';
+    return ErrorCategory.NETWORK;
   }
 
   // Authentication errors
   if (message.includes('unauthorized') || message.includes('authentication') ||
       name.includes('auth')) {
-    return 'AUTHENTICATION';
+    return ErrorCategory.AUTHENTICATION;
   }
 
   // Authorization errors
   if (message.includes('forbidden') || message.includes('permission') ||
       name.includes('authorization')) {
-    return 'AUTHORIZATION';
+    return ErrorCategory.AUTHORIZATION;
   }
 
-  return 'UNKNOWN';
+  return ErrorCategory.UNKNOWN;
 }
 
 /**
@@ -717,20 +695,15 @@ export function createUserFriendlyMessage(error: any, category: ErrorCategory): 
   
   // Add specific details for certain error types
   switch (category) {
-    case 'VALIDATION':
+    case ErrorCategory.VALIDATION:
       if (error.errors && Array.isArray(error.errors)) {
         const firstError = error.errors[0];
         return `${defaultMessage} ${firstError.message || ''}`;
       }
       break;
-    case 'NOT_FOUND':
+    case ErrorCategory.NOT_FOUND:
       if (error.resource) {
         return `The ${error.resource} was not found.`;
-      }
-      break;
-    case 'RATE_LIMIT':
-      if (error.retryAfter) {
-        return `Too many requests. Please wait ${error.retryAfter} seconds and try again.`;
       }
       break;
   }
@@ -772,16 +745,10 @@ export function extractStatusCode(error: any): number | undefined {
  */
 export function isRetryableError(category: ErrorCategory, error: any): boolean {
   // Network errors are usually retryable
-  if (category === 'NETWORK') return true;
-  
-  // Timeout errors are retryable
-  if (category === 'TIMEOUT') return true;
+  if (category === ErrorCategory.NETWORK) return true;
   
   // Server errors (5xx) are retryable
-  if (category === 'SERVER') return true;
-  
-  // Rate limit errors might be retryable after delay
-  if (category === 'RATE_LIMIT') return true;
+  if (category === ErrorCategory.SERVER) return true;
   
   // Check if error explicitly indicates retryability
   if (error.retryable !== undefined) return error.retryable;
@@ -801,7 +768,7 @@ export const DEFAULT_RETRY_CONFIG: RetryStrategy = {
   baseDelay: 1000,
   maxDelay: 10000,
   backoffMultiplier: 2,
-  retryableErrors: ['NETWORK', 'TIMEOUT', 'SERVER', 'RATE_LIMIT']
+  retryableErrors: ['NETWORK', 'SERVER']
 };
 
 /**
@@ -813,13 +780,13 @@ export const DEFAULT_RETRY_CONFIG: RetryStrategy = {
  * 
  * @example
  * ```typescript
- * const result = await withRetry(
+ * const result = await withRetryOperation(
  *   () => api.fetchData(),
  *   { maxAttempts: 3, baseDelay: 1000 }
  * );
  * ```
  */
-export async function withRetry<T>(
+export async function withRetryOperation<T>(
   fn: () => Promise<T>,
   config: Partial<RetryStrategy> = {}
 ): Promise<T> {
@@ -884,8 +851,8 @@ export function logError(
     },
     context: {
       ...context,
-      url: window.location.href,
-      userAgent: navigator.userAgent,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+      userAgent: typeof window !== 'undefined' ? navigator.userAgent : undefined,
       timestamp: new Date().toISOString()
     }
   };
@@ -929,11 +896,14 @@ export async function reportError(error: AppError, context?: ErrorContext): Prom
     },
     context: {
       ...context,
-      url: window.location.href,
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-      userId: (window as any).userId,
-      sessionId: (window as any).sessionId
+      timestamp: Date.now(),
+      additionalData: {
+        ...context?.additionalData,
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        userAgent: typeof window !== 'undefined' ? navigator.userAgent : undefined,
+        userId: typeof window !== 'undefined' ? (window as any).userId : undefined,
+        sessionId: typeof window !== 'undefined' ? (window as any).sessionId : undefined
+      }
     }
   };
 
@@ -984,7 +954,7 @@ export function useErrorHandler(config: ErrorHandlerConfig = {}) {
     logError(appError, context);
     
     // Report critical errors
-    if (appError.severity === 'CRITICAL' || appError.severity === 'HIGH') {
+    if (appError.severity === ErrorSeverity.CRITICAL || appError.severity === ErrorSeverity.ERROR) {
       reportError(appError, context);
     }
     
@@ -1010,10 +980,10 @@ export function useErrorHandler(config: ErrorHandlerConfig = {}) {
   ) => {
     setIsProcessing(true);
     try {
-      const result = await withRetry(operation, config.retryStrategy);
+      const result = await withRetryOperation(operation);
       clearError();
       if (config.onRetry) {
-        config.onRetry(result);
+        config.onRetry();
       }
       return result;
     } catch (error) {
@@ -1025,7 +995,7 @@ export function useErrorHandler(config: ErrorHandlerConfig = {}) {
   }, [handleError, clearError, config]);
 
   const wrapAsyncOperation = useCallback((
-    operation: () => Promise<any>,
+    operation: (...args: any[]) => Promise<any>,
     context?: ErrorContext
   ) => {
     return async (...args: any[]) => {
@@ -1062,8 +1032,9 @@ export function useErrorHandler(config: ErrorHandlerConfig = {}) {
  */
 export function createErrorBoundaryState(error: any): ErrorBoundaryState {
   const appError = createStandardizedError(error, {
-    component: 'ErrorBoundary',
-    timestamp: new Date().toISOString()
+    operation: 'ErrorBoundary',
+    module: 'ErrorBoundary',
+    timestamp: Date.now()
   });
 
   return {
@@ -1071,7 +1042,6 @@ export function createErrorBoundaryState(error: any): ErrorBoundaryState {
     error: appError,
     errorInfo: {
       componentStack: error.componentStack || '',
-      timestamp: new Date().toISOString()
     }
   };
 }
@@ -1108,10 +1078,10 @@ export function validationResultToError(
     new Error('Validation failed'),
     {
       ...context,
-      validationErrors: validationResult.errors
+      additionalData: { validationErrors: validationResult.errors }
     },
-    'VALIDATION',
-    'MEDIUM'
+    ErrorCategory.VALIDATION,
+    ErrorSeverity.WARNING
   );
 }
 
@@ -1130,13 +1100,4 @@ export function formatValidationErrors(errors: ValidationError[]): string[] {
   });
 }
 
-// ================================
-// EXPORTS
-// ================================
-
-export {
-  ERROR_CATEGORIES,
-  ERROR_SEVERITY,
-  DEFAULT_ERROR_MESSAGES,
-  DEFAULT_RETRY_CONFIG
-}; 
+ 

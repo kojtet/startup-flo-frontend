@@ -166,6 +166,12 @@ export function useCampaigns() {
     const newCampaign: Campaign = {
       id: Date.now().toString(),
       ...campaignData,
+      end_goals: campaignData.end_goals?.map(goal => ({
+        ...goal,
+        id: Date.now().toString() + Math.random(),
+        current_value: 0,
+        is_completed: false
+      })) || [],
       impressions: 0,
       clicks: 0,
       conversions: 0,
@@ -187,9 +193,16 @@ export function useCampaigns() {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 300));
 
+    const existingCampaign = campaigns.find(c => c.id === campaignId)!;
     const updatedCampaign: Campaign = {
-      ...campaigns.find(c => c.id === campaignId)!,
+      ...existingCampaign,
       ...campaignData,
+      end_goals: campaignData.end_goals?.map(goal => ({
+        ...goal,
+        id: Date.now().toString() + Math.random(),
+        current_value: 0,
+        is_completed: false
+      })) || existingCampaign.end_goals || [],
       updated_at: new Date().toISOString()
     };
 

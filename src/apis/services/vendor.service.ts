@@ -60,7 +60,7 @@ export class VendorService {
         VENDOR_ENDPOINTS.VENDORS_LIST, 
         { ...config, params }
       );
-      return response.data.vendors;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -86,7 +86,7 @@ export class VendorService {
         VENDOR_ENDPOINTS.VENDORS_BY_CATEGORY,
         { ...config, params: { category_id: categoryId } }
       );
-      return response.data.vendors;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -134,7 +134,7 @@ export class VendorService {
         data, 
         config
       );
-      return response.data.vendor;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -161,7 +161,7 @@ export class VendorService {
         VENDOR_ENDPOINTS.VENDOR_DETAIL(vendorId), 
         config
       );
-      return response.data.vendor;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -199,7 +199,7 @@ export class VendorService {
         data, 
         config
       );
-      return response.data.vendor;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -250,7 +250,7 @@ export class VendorService {
         VENDOR_ENDPOINTS.VENDOR_CATEGORIES_LIST, 
         config
       );
-      return response.data.categories;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -284,7 +284,7 @@ export class VendorService {
         data, 
         config
       );
-      return response.data.category;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -310,7 +310,7 @@ export class VendorService {
         VENDOR_ENDPOINTS.VENDOR_CATEGORY_DETAIL(categoryId), 
         config
       );
-      return response.data.category;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -345,7 +345,7 @@ export class VendorService {
         data, 
         config
       );
-      return response.data.category;
+      return response.data.data;
     } catch (error) {
       throw handleApiError(error);
     }

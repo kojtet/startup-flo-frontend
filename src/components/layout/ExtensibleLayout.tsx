@@ -3,6 +3,7 @@ import { useState } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar-provider";
 import { ExtensibleSidebar, SidebarSection } from "@/components/ui/extensible-sidebar";
 import { Navbar } from "./Navbar";
+import { ProductNav } from "@/components/ui/product-nav";
 import { 
   LayoutDashboard,
   Users as UsersIcon,
@@ -32,11 +33,18 @@ function LayoutContent({ children, moduleSidebar, moduleTitle }: ExtensibleLayou
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Product Navigation Bar - REMOVED: Should not show in dashboard */}
+      {/* <div className="fixed top-0 w-full z-50">
+        <ProductNav currentProduct="startup-flo" />
+      </div> */}
+      
       {/* Global Header - Fixed and covers everything with proper spacing */}
-      <Navbar onMobileMenuToggle={handleMobileMenuToggle} />
+      <div className="fixed top-0 w-full z-50">
+        <Navbar onMobileMenuToggle={handleMobileMenuToggle} />
+      </div>
 
       {/* Main Sidebar - Always visible on desktop, fixed width */}
-      <div className={`${mobileSidebarOpen ? "block" : "hidden"} md:block pt-[60px]`}>
+      <div className={`${mobileSidebarOpen ? "block" : "hidden"} md:block pt-[64px]`}>
         <ExtensibleSidebar
           sections={[
             {
@@ -61,7 +69,7 @@ function LayoutContent({ children, moduleSidebar, moduleTitle }: ExtensibleLayou
 
       {/* Module Sidebar - Only visible when moduleSidebar is provided */}
       {moduleSidebar && (
-        <div className="hidden md:block pt-[60px]">
+        <div className="hidden md:block pt-[64px]">
           <ExtensibleSidebar
             sections={moduleSidebar}
             // Removed showLogo={false}
@@ -72,7 +80,7 @@ function LayoutContent({ children, moduleSidebar, moduleTitle }: ExtensibleLayou
         </div>
       )}
       
-      <div className="flex-1 flex flex-col overflow-hidden pt-[60px]">
+      <div className="flex-1 flex flex-col overflow-hidden pt-[64px]">
         <main className="flex-1 overflow-y-auto p-6 ml-3">
           {children}
         </main>

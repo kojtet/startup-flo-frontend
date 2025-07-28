@@ -36,7 +36,7 @@ interface UserContextType {
   companyUsersError: string | null; // Add error state for company users
   
   // Actions
-  fetchUserProfile: () => Promise<void>;
+  fetchUserProfile?: () => Promise<void>; // Made optional since not using this functionality
   updateUserProfile: (userData: UpdateUserProfileData) => Promise<ApiUser>;
   updateUserPreferences: (preferences: UpdateUserPreferencesData) => Promise<void>;
   uploadUserAvatar: (file: File) => Promise<ApiUser>;
@@ -48,7 +48,7 @@ interface UserContextType {
   
   // Cache management
   clearUserCache: () => void;
-  refreshUserProfile: () => Promise<void>;
+  refreshUserProfile?: () => Promise<void>; // Made optional since not using this functionality
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -103,26 +103,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [user, userProfile]);
   
-  // Fetch user profile with caching
-  const fetchUserProfile = useCallback(async (userId?: string) => {
-    setIsLoadingProfile(true);
-    setProfileError(null);
-    try {
-      // @ts-ignore
-      const data = await api.user.getUserProfile(userId);
-      setUserProfile(data);
-      const cacheKey = userId ? `user_profile_${userId}` : "current_user_profile";
-      localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
-    } catch (err) {
-      console.error("Failed to fetch user profile:", err);
-      const errorMessage = err instanceof ApiError 
-        ? err.message 
-        : "Failed to load user profile. Please try again.";
-      setProfileError(errorMessage);
-    } finally {
-      setIsLoadingProfile(false);
-    }
-  }, []);
+  // Fetch user profile with caching - COMMENTED OUT: Not using this functionality
+  // const fetchUserProfile = useCallback(async (userId?: string) => {
+  //   setIsLoadingProfile(true);
+  //   setProfileError(null);
+  //   try {
+  //     // @ts-ignore
+  //     const data = await api.user.getUserProfile(userId);
+  //     setUserProfile(data);
+  //     const cacheKey = userId ? `user_profile_${userId}` : "current_user_profile";
+  //     localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+  //   } catch (err) {
+  //     console.error("Failed to fetch user profile:", err);
+  //     const errorMessage = err instanceof ApiError 
+  //       ? err.message 
+  //       : "Failed to load user profile. Please try again.";
+  //     setProfileError(errorMessage);
+  //   } finally {
+  //     setIsLoadingProfile(false);
+  //   }
+  // }, []);
   
   // Update user profile
   const updateUserProfile = useCallback(async (userData: UpdateUserProfileData): Promise<ApiUser> => {
@@ -326,19 +326,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     console.log("User cache cleared");
   }, []);
   
-  const refreshUserProfile = useCallback(async () => {
-    // setLastProfileFetch(0); // Invalidate cache, Unused
-    await fetchUserProfile();
-  }, [fetchUserProfile]);
+  // const refreshUserProfile = useCallback(async () => {
+  //   // setLastProfileFetch(0); // Invalidate cache, Unused
+  //   await fetchUserProfile();
+  // }, [fetchUserProfile]);
   
-  // Auto-fetch user data on auth change
-  useEffect(() => {
-    if (isAuthenticated && !userProfile) {
-      fetchUserProfile();
-    } else if (!isAuthenticated) {
-      clearUserCache();
-    }
-  }, [isAuthenticated, userProfile, fetchUserProfile, clearUserCache]);
+  // Auto-fetch user data on auth change - COMMENTED OUT: Not using this functionality
+  // useEffect(() => {
+  //   if (isAuthenticated && !userProfile) {
+  //     fetchUserProfile();
+  //   } else if (!isAuthenticated) {
+  //     clearUserCache();
+  //   }
+  // }, [isAuthenticated, userProfile, fetchUserProfile, clearUserCache]);
   
   const value: UserContextType = {
     // User state
@@ -360,7 +360,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     companyUsersError,
     
     // Actions
-    fetchUserProfile,
+    // fetchUserProfile, // COMMENTED OUT: Not using this functionality
     updateUserProfile,
     updateUserPreferences,
     uploadUserAvatar,
@@ -372,7 +372,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     
     // Cache management
     clearUserCache,
-    refreshUserProfile,
+    // refreshUserProfile, // COMMENTED OUT: Not using this functionality
   };
   
   return (

@@ -386,7 +386,7 @@ export function Navbar({ onMobileMenuToggle }: NavbarProps) {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 shadow-sm z-50">
+      <header className="fixed top-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 shadow-sm z-40">
         <div className="flex items-center justify-between px-4 sm:px-6 py-2">
           {/* Left side - Logo & Mobile menu button */}
           <div className="flex items-center">

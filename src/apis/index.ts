@@ -440,13 +440,61 @@ const assetsApi = {
   },
 };
 
+// Invitation API functions
+const invitationApi = {
+  // Get invitation info by token
+  getInvitationByToken: async (inviteToken: string) => {
+    const response = await api.get(`/company/invites/${inviteToken}`);
+    return response.data;
+  },
+  
+  // Accept invitation
+  acceptInvitation: async (inviteToken: string, data: {
+    email: string;
+    password: string;
+    first_name: string;
+    last_name: string;
+  }) => {
+    const response = await api.post(`/company/invites/${inviteToken}/accept`, data);
+    return response.data;
+  },
+  
+  // Send invitation
+  sendInvitation: async (data: {
+    email: string;
+    role: string;
+    company_id: string;
+  }) => {
+    const response = await api.post('/company/invites', data);
+    return response.data;
+  },
+  
+  // List company invitations
+  getCompanyInvitations: async (companyId: string) => {
+    const response = await api.get(`/company/invites/company/${companyId}`);
+    return response.data;
+  },
+  
+  // Expire invitation
+  expireInvitation: async (inviteId: string) => {
+    const response = await api.patch(`/company/invites/${inviteId}`, {});
+    return response.data;
+  },
+  
+  // Delete invitation
+  deleteInvitation: async (inviteId: string) => {
+    await api.delete(`/company/invites/${inviteId}`);
+  },
+};
+
 // Add TypeScript declaration for the extended api object
 declare module 'axios' {
   interface AxiosInstance {
     crm: typeof crmApi;
     assets: typeof assetsApi;
+    invitations: typeof invitationApi;
   }
 }
 
-// Extend the api object with CRM and Assets functionality
-Object.assign(api, { crm: crmApi, assets: assetsApi }); 
+// Extend the api object with CRM, Assets, and Invitation functionality
+Object.assign(api, { crm: crmApi, assets: assetsApi, invitations: invitationApi }); 

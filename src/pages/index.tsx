@@ -1,11 +1,33 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '@/contexts/AuthContext';
 import { ExtensibleLayout } from "@/components/layout/ExtensibleLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { UserDataLoader } from "@/components/auth/UserDataLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Briefcase, DollarSign, TrendingUp, FileText } from "lucide-react"; // Removed Calendar
+import { Users, Briefcase, DollarSign, TrendingUp, FileText } from "lucide-react";
 import { ClientOnly } from "@/components/ui/ClientOnly";
+import LandingPage from './landing';
 
-export default function Dashboard() {
+export default function HomePage() {
+  const { isAuthenticated, isHydrated } = useAuth();
+  const router = useRouter();
+
+  // If not hydrated yet, show loading
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show landing page
+  if (!isAuthenticated) {
+    return <LandingPage />;
+  }
+
+  // If authenticated, show dashboard
   return (
     <ProtectedRoute>
       <UserDataLoader>

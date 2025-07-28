@@ -13,6 +13,7 @@ const AcceptInvitePage = () => {
   const [loading, setLoading] = useState(true);
   const [invite, setInvite] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
+  const [modules, setModules] = useState<any[]>([]);
   const [form, setForm] = useState({
     email: '',
     first_name: '',
@@ -30,6 +31,7 @@ const AcceptInvitePage = () => {
         const res = await api.invitations.getInvitationByToken(token as string);
         setInvite(res.invite);
         setCompany(res.company);
+        setModules(res.modules || []);
         setForm(f => ({ ...f, email: res.invite.email }));
       } catch (error: any) {
         toast({ title: 'Error', description: error.message || 'Invalid or expired invite', variant: 'destructive' });
@@ -117,6 +119,32 @@ const AcceptInvitePage = () => {
     );
   }
 
+  // Check if invitation is already accepted or expired
+  if (invite.status !== 'pending') {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-muted">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-destructive">
+              {invite.status === 'accepted' ? 'Invitation Already Accepted' : 'Invitation Expired'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-4">
+              {invite.status === 'accepted' 
+                ? 'This invitation has already been accepted. Please contact your administrator if you need access.'
+                : 'This invitation has expired. Please contact your administrator for a new invitation.'
+              }
+            </p>
+            <Button onClick={() => router.push('/')} className="w-full">
+              Go to Homepage
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex justify-center items-center min-h-screen bg-muted">
       <Card className="w-full max-w-md">
@@ -129,6 +157,23 @@ const AcceptInvitePage = () => {
             <p className="text-center text-sm text-muted-foreground">
               Role: <span className="capitalize">{invite.role}</span>
             </p>
+          )}
+          {modules.length > 0 && (
+            <div className="mt-4">
+              <p className="text-center text-sm text-muted-foreground mb-2">
+                You'll have access to these modules:
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {modules.map((module) => (
+                  <span
+                    key={module.id}
+                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                  >
+                    {module.label}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </CardHeader>
         <CardContent>

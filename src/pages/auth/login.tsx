@@ -3,6 +3,8 @@ import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
+import Link from "next/link";
+import { Home } from "lucide-react";
 
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
@@ -34,6 +36,17 @@ export default function LoginPage() {
   }
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50">
+      {/* Home link in top left corner */}
+      <div className="absolute top-6 left-6 z-10">
+        <Link 
+          href="/" 
+          className="flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200 bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg shadow-sm border border-gray-200"
+        >
+          <Home className="h-4 w-4 mr-2" />
+          Home
+        </Link>
+      </div>
+      
       <div className="flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center mb-8">

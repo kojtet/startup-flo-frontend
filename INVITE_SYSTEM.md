@@ -32,13 +32,40 @@ Where `{invite_token}` is a JWT token containing:
 
 #### Get Invitation Details
 ```
-GET /company/invites/{invite_token}
+GET /invites/{invite_token}
 ```
-Returns invitation details including company information.
+Returns invitation details including company information and module access.
+
+Response:
+```json
+{
+  "invite": {
+    "id": "1d1d7ede-60e6-493c-9e29-32bd8b30239a",
+    "email": "user@example.com",
+    "company_id": "d4dd2666-bfa8-49ed-8658-058f4e00b360",
+    "role": "admin",
+    "status": "pending",
+    "expires_at": "2025-08-04T13:01:40.536+00:00",
+    "module_access": ["f6d74ab6-c02b-47b1-87b0-b88a17a922d4"]
+  },
+  "company": {
+    "id": "d4dd2666-bfa8-49ed-8658-058f4e00b360",
+    "name": "Company Name"
+  },
+  "modules": [
+    {
+      "id": "f6d74ab6-c02b-47b1-87b0-b88a17a922d4",
+      "name": "HR",
+      "label": "HR",
+      "description": "Human Resources Management"
+    }
+  ]
+}
+```
 
 #### Accept Invitation
 ```
-POST /company/invites/{invite_token}/accept
+POST /invites/{invite_token}/accept
 ```
 Body:
 ```json
@@ -67,6 +94,8 @@ The invite page:
 - **Error handling**: Displays appropriate error messages for invalid/expired invites
 - **Form validation**: Validates required fields, password length, and password confirmation
 - **User-friendly UI**: Clean, responsive design with helpful text and placeholders
+- **Module access display**: Shows which modules the user will have access to
+- **Status validation**: Checks invitation status (pending, accepted, expired) and shows appropriate messages
 
 ### 5. Security Considerations
 

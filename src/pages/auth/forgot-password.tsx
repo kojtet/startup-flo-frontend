@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/ui/logo";
-import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle, Home } from "lucide-react";
 import Link from "next/link";
 
 export default function ForgotPasswordPage() {
@@ -26,6 +26,17 @@ export default function ForgotPasswordPage() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+        {/* Home link in top left corner */}
+        <div className="absolute top-6 left-6 z-10">
+          <Link 
+            href="/" 
+            className="flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200 bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg shadow-sm border border-gray-200"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            Home
+          </Link>
+        </div>
+        
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center mb-8">
             <Logo size="xl" />
@@ -87,6 +98,17 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Home link in top left corner */}
+      <div className="absolute top-6 left-6 z-10">
+        <Link 
+          href="/" 
+          className="flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200 bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg shadow-sm border border-gray-200"
+        >
+          <Home className="h-4 w-4 mr-2" />
+          Home
+        </Link>
+      </div>
+      
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-8">
           <Logo size="xl" />

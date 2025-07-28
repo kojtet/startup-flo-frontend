@@ -444,7 +444,7 @@ const assetsApi = {
 const invitationApi = {
   // Get invitation info by token
   getInvitationByToken: async (inviteToken: string) => {
-    const response = await api.get(`/company/invites/${inviteToken}`);
+    const response = await api.get(`/invites/${inviteToken}`);
     return response.data;
   },
   
@@ -455,7 +455,7 @@ const invitationApi = {
     first_name: string;
     last_name: string;
   }) => {
-    const response = await api.post(`/company/invites/${inviteToken}/accept`, data);
+    const response = await api.post(`/invites/${inviteToken}/accept`, data);
     return response.data;
   },
   
@@ -465,25 +465,25 @@ const invitationApi = {
     role: string;
     company_id: string;
   }) => {
-    const response = await api.post('/company/invites', data);
+    const response = await api.post('/invites', data);
     return response.data;
   },
   
   // List company invitations
   getCompanyInvitations: async (companyId: string) => {
-    const response = await api.get(`/company/invites/company/${companyId}`);
+    const response = await api.get(`/invites/company/${companyId}`);
     return response.data;
   },
   
   // Expire invitation
   expireInvitation: async (inviteId: string) => {
-    const response = await api.patch(`/company/invites/${inviteId}`, {});
+    const response = await api.patch(`/invites/${inviteId}`, {});
     return response.data;
   },
   
   // Delete invitation
   deleteInvitation: async (inviteId: string) => {
-    await api.delete(`/company/invites/${inviteId}`);
+    await api.delete(`/invites/${inviteId}`);
   },
 };
 

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface Employee {
   id: string;
   company_id: string;

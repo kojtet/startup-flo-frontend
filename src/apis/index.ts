@@ -54,6 +54,59 @@ export type {
   UpdateAssetCategoryData
 } from './types';
 
+// Invitation types
+export interface AcceptInvitationData {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface AcceptInvitationSuccessResponse {
+  message: string;
+  user: {
+    id: string;
+    email: string;
+    company_id: string;
+    role: string;
+  };
+  details: string;
+}
+
+export interface AcceptInvitationErrorResponse {
+  message: string;
+  errors: string[];
+}
+
+// Password validation utility
+export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (password.length < 8) {
+    errors.push("Password must be at least 8 characters long");
+  }
+  
+  if (!/[A-Z]/.test(password)) {
+    errors.push("Password must contain at least one uppercase letter");
+  }
+  
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push("Password must contain at least one special character");
+  }
+  
+  // Check for common sequences (basic check)
+  const commonSequences = ['123', 'abc', 'qwe', 'asd', 'password', '123456'];
+  const lowerPassword = password.toLowerCase();
+  if (commonSequences.some(seq => lowerPassword.includes(seq))) {
+    errors.push("Password must not contain common sequences");
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
 // Extend AxiosRequestConfig to include metadata
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -444,19 +497,32 @@ const assetsApi = {
 const invitationApi = {
   // Get invitation info by token
   getInvitationByToken: async (inviteToken: string) => {
-    const response = await api.get(`/invites/${inviteToken}`);
-    return response.data;
+    try {
+      const response = await api.get(`/invites/${inviteToken}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(`Failed to get invitation: ${error.response?.data?.message || error.message}`);
+    }
   },
   
   // Accept invitation
-  acceptInvitation: async (inviteToken: string, data: {
-    email: string;
-    password: string;
-    first_name: string;
-    last_name: string;
-  }) => {
-    const response = await api.post(`/invites/${inviteToken}/accept`, data);
-    return response.data;
+  acceptInvitation: async (inviteToken: string, data: AcceptInvitationData) => {
+    // Validate password before making API call
+    const passwordValidation = validatePassword(data.password);
+    if (!passwordValidation.isValid) {
+      throw new Error(`Password validation failed: ${passwordValidation.errors.join(', ')}`);
+    }
+    
+    try {
+      const response = await api.post(`/invites/${inviteToken}/accept`, data);
+      return response.data as AcceptInvitationSuccessResponse;
+    } catch (error: any) {
+      if (error.response?.data?.message === "Password does not meet requirements") {
+        // Return the specific validation errors from the server
+        throw new Error(`Password validation failed: ${error.response.data.errors.join(', ')}`);
+      }
+      throw new Error(`Failed to accept invitation: ${error.response?.data?.message || error.message}`);
+    }
   },
   
   // Send invitation

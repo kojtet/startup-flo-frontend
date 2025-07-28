@@ -49,7 +49,6 @@ export function InviteTeamStep({ data, updateData, onBack, isLoading, setIsLoadi
 
   // Helper function to prepare signup payload matching backend requirements
   const prepareSignupPayload = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
       email: data.email?.trim(),
       password: data.password,

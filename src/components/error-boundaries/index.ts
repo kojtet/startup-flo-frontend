@@ -79,7 +79,7 @@ export const Component = ComponentErrorBoundary;
 export const Route = RouteErrorBoundary;
 
 // Default export for easy importing
-export default {
+const ErrorBoundaries = {
   // Components
   Base: BaseErrorBoundary,
   Auth: AuthErrorBoundary,
@@ -100,4 +100,6 @@ export default {
   // Utilities
   withErrorBoundary,
   withSafeExecution,
-}; 
+};
+
+export default ErrorBoundaries; 

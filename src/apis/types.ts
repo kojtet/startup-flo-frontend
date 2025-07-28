@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface Employee {
   id: string;
   company_id: string;
@@ -32,6 +33,7 @@ export interface CreateEmployeeData {
   status: "active" | "inactive" | "terminated";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type UpdateEmployeeData = Partial<CreateEmployeeData>;
 
 export interface Department {
@@ -100,6 +102,7 @@ export interface CreateProjectData {
   status: "active" | "not_started" | "in_progress" | "completed" | "on_hold" | "cancelled";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type UpdateProjectData = Partial<CreateProjectData>;
 
 export interface ProjectTask {

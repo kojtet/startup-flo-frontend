@@ -6,8 +6,6 @@ import {
   AcceptInvitationSuccessResponse,
   validatePassword 
 } from '../../apis';
-import { useAuth } from '../../contexts/AuthContext';
-import { handlePostInvitationFlow } from '../../apis/utils/post-invitation-flow';
 
 interface AcceptInvitationProps {
   inviteToken: string;
@@ -15,7 +13,6 @@ interface AcceptInvitationProps {
 
 const AcceptInvitation: React.FC<AcceptInvitationProps> = ({ inviteToken }) => {
   const router = useRouter();
-  const { login } = useAuth();
   const [formData, setFormData] = useState<AcceptInvitationData>({
     email: '',
     password: '',
@@ -69,39 +66,18 @@ const AcceptInvitation: React.FC<AcceptInvitationProps> = ({ inviteToken }) => {
         return;
       }
 
-      // Step 1: Accept the invitation
+      // Accept the invitation
       const response: AcceptInvitationSuccessResponse = await api.invitations.acceptInvitation(
         inviteToken, 
         formData
       );
 
-      // Step 2: Handle post-invitation flow
-      const flowResult = await handlePostInvitationFlow(
-        response,
-        { email: formData.email, password: formData.password },
-        {
-          onSuccess: (user) => {
-            console.log('User created successfully:', user);
-          },
-          onLoginSuccess: () => {
-            setSuccess('Account created and logged in successfully! Redirecting to dashboard...');
-          },
-          onLoginFailure: (message) => {
-            setSuccess(message);
-          },
-          onError: (errorMessage) => {
-            setError(errorMessage);
-          },
-          redirectTo: '/dashboard'
-        }
-      );
-
-      // Update UI based on flow result
-      if (flowResult.success) {
-        setSuccess(flowResult.message);
-      } else {
-        setError(flowResult.message);
-      }
+      setSuccess('Account created successfully! Redirecting to login...');
+      
+      // Redirect to login page after a short delay
+      setTimeout(() => {
+        router.push(`/auth/login?email=${encodeURIComponent(formData.email)}&invitation=success`);
+      }, 2000);
 
     } catch (err: any) {
       setError(err.message);

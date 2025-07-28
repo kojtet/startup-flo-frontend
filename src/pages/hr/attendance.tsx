@@ -4,20 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-// import { // Unused Table components
-//   Table,
-//   TableBody,
-//   TableCell,
-//   TableHead,
-//   TableHeader,
-//   TableRow,
-// } from "@/components/ui/table";
-// import { // Unused DropdownMenu components
-//   DropdownMenu,
-//   DropdownMenuContent,
-//   DropdownMenuItem,
-//   DropdownMenuTrigger,
-// } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -25,14 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// import { DatePickerWithRange } from "@/components/ui/date-picker-with-range"; // Unused
 import {
   Clock,
   Smartphone,
   Plus,
   CheckCircle,
   AlertTriangle,
-  XCircle
+  XCircle,
+  Loader2
 } from "lucide-react";
 import { useState } from "react";
 
@@ -44,6 +38,14 @@ export default function AttendanceLog() {
     action: '',
     time: ''
   });
+
+  // TimeFence connection states
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionProgress, setConnectionProgress] = useState(0);
+  const [connectionError, setConnectionError] = useState('');
 
   const user = {
     name: "John Doe",
@@ -95,6 +97,87 @@ export default function AttendanceLog() {
     }
   };
 
+  const handleConnectClick = () => {
+    if (isTimeFenceConnected) {
+      // Disconnect logic
+      setIsTimeFenceConnected(false);
+    } else {
+      // Show connection modal
+      setShowConnectionModal(true);
+    }
+  };
+
+  const handleConnectionSubmit = () => {
+    if (!apiKey.trim()) {
+      setConnectionError('Please enter your TimeFence API key');
+      return;
+    }
+    setConnectionError('');
+    setShowConnectionModal(false);
+    setShowConfirmationModal(true);
+  };
+
+  const handleConfirmConnection = async () => {
+    setIsConnecting(true);
+    setConnectionProgress(0);
+    setConnectionError('');
+    setShowConfirmationModal(false);
+
+    // Simulate progress updates
+    const progressInterval = setInterval(() => {
+      setConnectionProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 500);
+
+    try {
+      // Replace with your actual base URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${baseUrl}/hr/timefence/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          api_key: apiKey
+        })
+      });
+
+      clearInterval(progressInterval);
+      setConnectionProgress(100);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('TimeFence connection successful:', result);
+        setIsTimeFenceConnected(true);
+        setApiKey('');
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to connect to TimeFence');
+      }
+    } catch (error) {
+      clearInterval(progressInterval);
+      setConnectionError(error instanceof Error ? error.message : 'Connection failed');
+      console.error('TimeFence connection error:', error);
+    } finally {
+      setIsConnecting(false);
+      setTimeout(() => {
+        setConnectionProgress(0);
+      }, 2000);
+    }
+  };
+
+  const handleCancelConnection = () => {
+    setShowConnectionModal(false);
+    setShowConfirmationModal(false);
+    setApiKey('');
+    setConnectionError('');
+  };
+
   return (
     <ExtensibleLayout moduleSidebar={hrSidebarSections} moduleTitle="Human Resources" >
       <div className="space-y-6">
@@ -125,17 +208,48 @@ export default function AttendanceLog() {
                     </span>
                   </div>
                   <Button 
-                    onClick={() => setIsTimeFenceConnected(!isTimeFenceConnected)}
+                    onClick={handleConnectClick}
                     variant={isTimeFenceConnected ? "outline" : "default"}
                     size="sm"
+                    disabled={isConnecting}
                   >
-                    {isTimeFenceConnected ? 'Disconnect' : 'Connect TimeFence'}
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      isTimeFenceConnected ? 'Disconnect' : 'Connect TimeFence'
+                    )}
                   </Button>
                 </div>
                 {isTimeFenceConnected && (
                   <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
                     <p className="text-sm text-green-700">
                       ✓ TimeFence is syncing attendance data automatically. Last sync: 2 minutes ago
+                    </p>
+                  </div>
+                )}
+                {isConnecting && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-blue-700">Connecting to TimeFence...</span>
+                        <span className="text-blue-700 font-medium">{connectionProgress}%</span>
+                      </div>
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${connectionProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {connectionError && (
+                  <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                    <p className="text-sm text-red-700">
+                      ✗ {connectionError}
                     </p>
                   </div>
                 )}
@@ -314,6 +428,77 @@ export default function AttendanceLog() {
           </CardContent>
         </Card>
       </div>
+
+      {/* TimeFence Connection Modal */}
+      <Dialog open={showConnectionModal} onOpenChange={setShowConnectionModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect TimeFence</DialogTitle>
+            <DialogDescription>
+              Enter your TimeFence API key to establish a connection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="api-key" className="text-sm font-medium">
+                API Key
+              </label>
+              <Input
+                id="api-key"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                type="password"
+                placeholder="Enter your TimeFence API key"
+              />
+            </div>
+            {connectionError && (
+              <p className="text-sm text-red-500">{connectionError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelConnection}>
+              Cancel
+            </Button>
+            <Button onClick={handleConnectionSubmit} disabled={isConnecting}>
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                "Connect TimeFence"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* TimeFence Confirmation Modal */}
+      <Dialog open={showConfirmationModal} onOpenChange={setShowConfirmationModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Connection</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to connect to TimeFence with the provided API key?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelConnection}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmConnection} disabled={isConnecting}>
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                "Confirm Connection"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ExtensibleLayout>
   );
 } 

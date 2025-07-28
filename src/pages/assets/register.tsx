@@ -25,7 +25,10 @@ import {
   Tag,
   MapPin,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   Dialog,
@@ -70,6 +73,14 @@ export default function AssetRegisterPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const generateUniqueAssetTag = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `AST${timestamp}${random}`;
+  };
 
   const [formData, setFormData] = useState<CreateAssetData>({
     name: '',
@@ -77,10 +88,10 @@ export default function AssetRegisterPage() {
     serial_number: '',
     purchase_date: '',
     purchase_cost: 0,
-    status: 'in_stock',
-    location: '',
+    status: 'available',
+    location: 'Default Location',
     notes: '',
-    asset_tag: '',
+    asset_tag: generateUniqueAssetTag(),
     depreciation_start: ''
   });
 
@@ -92,8 +103,7 @@ export default function AssetRegisterPage() {
 
   // Reset to first page when search or filters change
   useEffect(() => {
-    // This effect will run when search or filters change
-    // In a real implementation, you might want to reset pagination here
+    setCurrentPage(1);
   }, [searchTerm, statusFilter, categoryFilter]);
 
   const fetchData = async () => {
@@ -155,9 +165,10 @@ export default function AssetRegisterPage() {
       });
     } catch (error: any) {
       console.error('Error creating asset:', error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || "Failed to create asset";
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to create asset",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -251,7 +262,7 @@ export default function AssetRegisterPage() {
       purchase_date: asset.purchase_date,
       purchase_cost: asset.purchase_cost,
       status: asset.status,
-      location: asset.location || '',
+      location: asset.location || 'Default Location',
       notes: asset.notes || '',
       asset_tag: asset.asset_tag,
       depreciation_start: asset.depreciation_start || ''
@@ -266,10 +277,10 @@ export default function AssetRegisterPage() {
       serial_number: '',
       purchase_date: '',
       purchase_cost: 0,
-      status: 'in_stock',
-      location: '',
+      status: 'available',
+      location: 'Default Location',
       notes: '',
-      asset_tag: '',
+      asset_tag: generateUniqueAssetTag(),
       depreciation_start: ''
     });
   };
@@ -277,10 +288,11 @@ export default function AssetRegisterPage() {
   const getStatusBadgeColor = (status: Asset['status']) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
-      case 'in_stock': return 'bg-blue-100 text-blue-800';
+      case 'available': return 'bg-blue-100 text-blue-800';
       case 'assigned': return 'bg-purple-100 text-purple-800';
       case 'maintenance': return 'bg-yellow-100 text-yellow-800';
-      case 'retired': return 'bg-gray-100 text-gray-800';
+      case 'retired': return 'bg-orange-100 text-orange-800';
+      case 'disposed': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -331,13 +343,30 @@ export default function AssetRegisterPage() {
     return 0;
   });
 
+  // Pagination logic
+  const totalItems = sortedAssets.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAssets = sortedAssets.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'active', label: 'Active' },
-    { value: 'in_stock', label: 'In Stock' },
+    { value: 'available', label: 'Available' },
     { value: 'assigned', label: 'Assigned' },
     { value: 'maintenance', label: 'Under Maintenance' },
-    { value: 'retired', label: 'Retired' }
+    { value: 'retired', label: 'Retired' },
+    { value: 'disposed', label: 'Disposed' }
   ];
 
   if (!user) {
@@ -389,12 +418,23 @@ export default function AssetRegisterPage() {
                       </div>
                       <div>
                         <Label htmlFor="asset_tag">Asset Tag</Label>
-                        <Input
-                          id="asset_tag"
-                          value={formData.asset_tag}
-                          onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
-                          required
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="asset_tag"
+                            value={formData.asset_tag}
+                            onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFormData(prev => ({ ...prev, asset_tag: generateUniqueAssetTag() }))}
+                            title="Generate unique asset tag"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <div>
                         <Label htmlFor="category_id">Category</Label>
@@ -440,14 +480,7 @@ export default function AssetRegisterPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div>
-                        <Label htmlFor="location">Location</Label>
-                        <Input
-                          id="location"
-                          value={formData.location}
-                          onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                        />
-                      </div>
+
                       <div>
                         <Label htmlFor="purchase_date">Purchase Date</Label>
                         <Input
@@ -562,14 +595,16 @@ export default function AssetRegisterPage() {
           </div>
         </div>
 
+
         {/* Assets Grid */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : (
-          <div className="grid gap-6">
-            {sortedAssets.map((asset) => (
+          <div className="space-y-6">
+            <div className="grid gap-6">
+              {paginatedAssets.map((asset) => (
               <Card key={asset.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -645,6 +680,81 @@ export default function AssetRegisterPage() {
               </Card>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {totalItems > 0 && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="items-per-page" className="text-sm">Items per page:</Label>
+                <Select value={itemsPerPage.toString()} onValueChange={(value) => handleItemsPerPageChange(parseInt(value))}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} assets (Page {currentPage} of {totalPages})
+                </span>
+              </div>
+              
+                              <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  
+                  {totalPages > 1 && (
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNumber;
+                        if (totalPages <= 5) {
+                          pageNumber = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNumber = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNumber = totalPages - 4 + i;
+                        } else {
+                          pageNumber = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(pageNumber)}
+                            className="w-8 h-8"
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+            </div>
+          )}
+        </div>
         )}
 
         {/* Edit Dialog */}

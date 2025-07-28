@@ -7,10 +7,9 @@ This document explains what happens after a user successfully accepts an invitat
 When a user accepts an invitation, the following sequence of events occurs:
 
 1. **Account Creation** - User account is created in the database
-2. **Authentication Flow** - User is automatically logged in (if possible)
-3. **Session Management** - User session is established
-4. **Redirect** - User is redirected to the appropriate page
-5. **Onboarding** - User may be guided through initial setup
+2. **Success Message** - User sees confirmation message
+3. **Redirect to Login** - User is redirected to the login page
+4. **Manual Login** - User logs in with their credentials
 
 ## Detailed Flow
 
@@ -31,181 +30,182 @@ After successful invitation acceptance, the backend returns:
 }
 ```
 
-### 2. Automatic Login Attempt
+### 2. Success Message Display
 
-The system attempts to automatically log in the user using their credentials:
-
-```typescript
-// Attempt to log in with the same credentials used for invitation acceptance
-await login({
-  email: formData.email,
-  password: formData.password
-});
+The user sees a success message:
+```
+"Account created successfully! Redirecting to login..."
 ```
 
-**Note**: The invitation acceptance endpoint does NOT return JWT tokens. The system must make a separate login request to obtain proper authentication tokens.
+### 3. Redirect to Login Page
 
-### 3. Session Establishment
-
-If automatic login succeeds:
-
-- **JWT Tokens**: Access and refresh tokens are obtained from the login endpoint
-- **User Context**: User data is stored in the AuthContext
-- **API Headers**: Authorization headers are set for subsequent API calls
-- **Local Storage**: Tokens and user data are persisted in localStorage
+After 2 seconds, the user is automatically redirected to the login page with pre-filled email:
 
 ```typescript
-// Tokens are stored in localStorage
-localStorage.setItem('sf_access_token', tokens.accessToken);
-localStorage.setItem('sf_refresh_token', tokens.refreshToken);
-localStorage.setItem('sf_user', JSON.stringify(user));
-
-// User context is updated
-setUser(user);
+// Redirect to login page with email pre-filled
+router.push(`/auth/login?email=${encodeURIComponent(formData.email)}&invitation=success`);
 ```
 
-### 4. Redirect to Dashboard
+### 4. Login Page Integration
 
-After successful login, the user is redirected to the dashboard:
+The login page can detect invitation success and show appropriate messaging:
 
 ```typescript
-// Redirect after 2 seconds to show success message
-setTimeout(() => {
-  router.push('/dashboard');
-}, 2000);
+import { getInvitationParams, isInvitationSuccess, getPrefillEmail } from '../apis/utils/invitation-login-helper';
+
+const LoginPage = () => {
+  const router = useRouter();
+  const invitationParams = getInvitationParams(router.query);
+  
+  const [email, setEmail] = useState(getPrefillEmail(invitationParams) || '');
+  const [showSuccessMessage, setShowSuccessMessage] = useState(isInvitationSuccess(invitationParams));
+  
+  // Show success message for 5 seconds
+  useEffect(() => {
+    if (showSuccessMessage) {
+      setTimeout(() => setShowSuccessMessage(false), 5000);
+    }
+  }, [showSuccessMessage]);
+  
+  return (
+    <div>
+      {showSuccessMessage && (
+        <div className="success-message">
+          Account created successfully! Please log in with your email and password.
+        </div>
+      )}
+      <form>
+        <input 
+          type="email" 
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+        />
+        {/* rest of login form */}
+      </form>
+    </div>
+  );
+};
 ```
 
-### 5. Fallback Flow
+## User Experience Flow
 
-If automatic login fails (e.g., due to network issues or server delays):
-
-- **Success Message**: User sees a success message with instructions
-- **Manual Login**: User is prompted to log in manually
-- **Email Pre-fill**: Login form may be pre-filled with their email
-
-```typescript
-// Fallback message
-setSuccess('Account created successfully! Please log in with your email and password.');
-```
-
-## User Experience Scenarios
-
-### Scenario 1: Successful Auto-Login
-1. User fills out invitation form
-2. Clicks "Accept Invitation"
-3. Sees: "Account created and logged in successfully! Redirecting to dashboard..."
-4. Automatically redirected to dashboard
-5. Fully authenticated and ready to use the application
-
-### Scenario 2: Auto-Login Failure
-1. User fills out invitation form
-2. Clicks "Accept Invitation"
-3. Sees: "Account created successfully! Please log in with your email and password."
-4. User manually logs in with their credentials
-5. Redirected to dashboard after manual login
-
-### Scenario 3: Network Issues
-1. User fills out invitation form
-2. Clicks "Accept Invitation"
-3. Sees error message if invitation acceptance fails
-4. User can retry the invitation acceptance
+### Complete Flow
+1. User receives invitation email with link
+2. User clicks invitation link
+3. User fills out invitation form (email, password, first name, last name)
+4. User clicks "Accept Invitation"
+5. System validates password requirements
+6. Account is created successfully
+7. User sees: "Account created successfully! Redirecting to login..."
+8. User is automatically redirected to login page
+9. Login page shows success message and pre-fills email
+10. User enters password and logs in
+11. User is redirected to dashboard
 
 ## Technical Implementation
 
-### Post-Invitation Flow Utility
-
-The `handlePostInvitationFlow` utility manages the complete post-creation process:
+### AcceptInvitation Component
 
 ```typescript
-const flowResult = await handlePostInvitationFlow(
-  response, // API response from invitation acceptance
-  credentials, // User credentials for login
-  {
-    onSuccess: (user) => {
-      // Called when user is created successfully
-    },
-    onLoginSuccess: () => {
-      // Called when auto-login succeeds
-    },
-    onLoginFailure: (message) => {
-      // Called when auto-login fails
-    },
-    onError: (errorMessage) => {
-      // Called when any error occurs
-    },
-    redirectTo: '/dashboard'
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(null);
+  setSuccess(null);
+
+  try {
+    // Client-side password validation
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      setError(`Password validation failed: ${passwordValidation.errors.join(', ')}`);
+      setLoading(false);
+      return;
+    }
+
+    // Accept the invitation
+    const response = await api.invitations.acceptInvitation(inviteToken, formData);
+
+    setSuccess('Account created successfully! Redirecting to login...');
+    
+    // Redirect to login page after a short delay
+    setTimeout(() => {
+      router.push(`/auth/login?email=${encodeURIComponent(formData.email)}&invitation=success`);
+    }, 2000);
+
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
   }
-);
+};
 ```
 
-### Error Handling
+### Login Page Helper Functions
+
+The `invitation-login-helper.ts` utility provides functions to:
+
+- Extract invitation parameters from URL
+- Check if user just completed invitation acceptance
+- Get success message
+- Pre-fill email field
+
+## Error Handling
 
 The system handles various error scenarios:
 
 1. **Password Validation Errors**: Client-side validation before API call
 2. **Server Validation Errors**: Backend password requirements
 3. **Network Errors**: Connection issues during API calls
-4. **Login Errors**: Auto-login failure after account creation
+4. **Invalid Tokens**: Expired or invalid invitation tokens
 
-### Security Considerations
+## Security Considerations
 
-1. **Token Management**: Proper JWT token handling and refresh
-2. **Session Security**: Secure storage of authentication data
-3. **Password Requirements**: Enforced on both client and server
-4. **HTTPS**: All API calls use secure connections
+1. **Password Requirements**: Enforced on both client and server
+2. **Token Validation**: Proper invitation token validation
+3. **HTTPS**: All API calls use secure connections
+4. **Input Validation**: Proper form validation and sanitization
+
+## Benefits of This Approach
+
+1. **Simplicity**: Straightforward flow without complex auto-login logic
+2. **Reliability**: No dependency on auto-login success
+3. **User Control**: Users explicitly log in with their credentials
+4. **Clear Feedback**: Users know exactly what happened and what to do next
+5. **Consistent Experience**: Same login flow for all users
 
 ## Integration Points
 
-### AuthContext Integration
+### URL Parameters
 
-The post-invitation flow integrates with the existing AuthContext:
+The login page receives these URL parameters:
+- `email`: Pre-filled email address
+- `invitation`: Set to "success" when coming from invitation acceptance
 
-```typescript
-import { useAuth } from '../../contexts/AuthContext';
+### Login Page Integration
 
-const { login } = useAuth();
-
-// Use the login function from AuthContext
-await login(credentials);
-```
-
-### Router Integration
-
-Uses Next.js router for navigation:
-
-```typescript
-import { useRouter } from 'next/router';
-
-const router = useRouter();
-router.push('/dashboard');
-```
-
-### Local Storage Integration
-
-Manages user session data:
-
-```typescript
-// Store invitation success state
-localStorage.setItem('sf_invitation_success', 'true');
-localStorage.setItem('sf_invitation_user_email', email);
-```
+The login page can:
+- Show success message for invitation completion
+- Pre-fill email field
+- Focus on password field for better UX
+- Clear success message after a few seconds
 
 ## Best Practices
 
-1. **User Feedback**: Always provide clear feedback about the process status
-2. **Error Recovery**: Graceful handling of auto-login failures
+1. **Clear Messaging**: Always provide clear feedback about the process status
+2. **Pre-fill Email**: Reduce friction by pre-filling the email field
 3. **Loading States**: Show loading indicators during API calls
 4. **Validation**: Client-side validation before server calls
-5. **Security**: Proper token management and secure storage
+5. **Error Recovery**: Graceful handling of all error scenarios
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Auto-login fails**: Check network connectivity and server status
-2. **Token issues**: Verify JWT token format and expiration
-3. **Redirect problems**: Ensure proper route configuration
-4. **Session persistence**: Check localStorage availability and permissions
+1. **Invalid invitation token**: Check token validity and expiration
+2. **Password requirements**: Verify password meets all requirements
+3. **Network errors**: Check connectivity and server status
+4. **Redirect issues**: Ensure proper route configuration
 
 ### Debug Information
 
@@ -213,14 +213,5 @@ Enable debug logging to track the flow:
 
 ```typescript
 console.log('Invitation accepted:', response);
-console.log('Auto-login attempt:', credentials);
-console.log('Flow result:', flowResult);
-```
-
-## Future Enhancements
-
-1. **Onboarding Flow**: Guided tour for new users
-2. **Email Verification**: Optional email verification step
-3. **Profile Completion**: Prompt to complete user profile
-4. **Welcome Email**: Send welcome email after successful creation
-5. **Analytics**: Track invitation acceptance and conversion rates 
+console.log('Redirecting to:', `/auth/login?email=${formData.email}&invitation=success`);
+``` 

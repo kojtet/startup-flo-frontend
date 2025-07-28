@@ -665,7 +665,7 @@ export interface Asset {
   purchase_cost: number;
   depreciation_start: string;
   current_value: number;
-  status: "active" | "in_stock" | "assigned" | "maintenance" | "retired";
+  status: "active" | "available" | "assigned" | "maintenance" | "retired" | "disposed";
   location: string;
   notes: string | null;
   created_at: string;
@@ -696,7 +696,7 @@ export interface CreateAssetData {
   purchase_date: string;
   purchase_cost: number;
   depreciation_start: string;
-  status: "active" | "in_stock" | "assigned" | "maintenance" | "retired";
+  status: "active" | "available" | "assigned" | "maintenance" | "retired" | "disposed";
   location: string;
   notes?: string;
 }

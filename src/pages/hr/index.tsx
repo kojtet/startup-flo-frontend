@@ -1,7 +1,7 @@
 import { ExtensibleLayout } from "@/components/layout/ExtensibleLayout";
 import { hrSidebarSections } from "@/components/sidebars/HRSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users2, DollarSign, CalendarDays, TrendingUp } from "lucide-react";
+import { Users2, DollarSign, CalendarDays, TrendingUp, Link, Clock, Building, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 
 export default function HRDashboard() {
   return (
@@ -120,6 +120,116 @@ export default function HRDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Connections & Integrations Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Link className="h-5 w-5" />
+              <span>Connections & Integrations</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* EmpHub Integration */}
+              <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Building className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">EmpHub</h3>
+                      <p className="text-sm text-gray-500">ESS Platform</p>
+                    </div>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Employee self-service platform for managing personal information, benefits, and requests.
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-green-600 font-medium">Connected</span>
+                  <button className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                    <span>Manage</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Timefence Integration */}
+              <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Clock className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Timefence</h3>
+                      <p className="text-sm text-gray-500">Attendance & Clocking</p>
+                    </div>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Time tracking and attendance management system with clock-in/out functionality.
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-green-600 font-medium">Connected</span>
+                  <button className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                    <span>Manage</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Standard Payroll Integration */}
+              <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Standard</h3>
+                      <p className="text-sm text-gray-500">Payroll Software</p>
+                    </div>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Comprehensive payroll processing software for salary calculations and tax management.
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-green-600 font-medium">Connected</span>
+                  <button className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                    <span>Manage</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Integration Status Summary */}
+            <div className="mt-6 pt-6 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-gray-600">3 Active Integrations</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm text-gray-600">0 Pending</span>
+                  </div>
+                </div>
+                <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                  View All Integrations
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </ExtensibleLayout>
   );

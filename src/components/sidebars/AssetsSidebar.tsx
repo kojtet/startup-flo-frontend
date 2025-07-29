@@ -4,7 +4,9 @@ import {
   Clipboard, 
   CalendarCheck2, 
   TrendingDown, 
-  Tags 
+  Tags,
+  BarChart3,
+  List
 } from "lucide-react";
 import { SidebarSection } from "@/components/ui/extensible-sidebar";
 
@@ -12,8 +14,8 @@ export const assetsSidebarSections: SidebarSection[] = [
   {
     title: "Asset Management",
     items: [
-      { label: "Overview", href: "/assets", icon: Archive },
-      { label: "Asset Register", href: "/assets/register", icon: Archive },
+      { label: "Overview", href: "/assets", icon: BarChart3 },
+      { label: "Asset Register", href: "/assets/register", icon: List },
       { label: "Assignments", href: "/assets/assignments", icon: Clipboard },
       { label: "Categories", href: "/assets/categories", icon: Tags },
     ]

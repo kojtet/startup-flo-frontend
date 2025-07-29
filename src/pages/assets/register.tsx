@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Asset, CreateAssetData, UpdateAssetData, AssetCategory } from '@/apis/types';
+import { useHR } from '@/hooks/useHR';
+import type { Asset, CreateAssetData, UpdateAssetData, AssetCategory, Employee, AssignAssetData, UnassignAssetData } from '@/apis/types';
 import { 
   Archive, 
   Plus, 
@@ -28,7 +29,8 @@ import {
   ChevronDown,
   RefreshCw,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User
 } from 'lucide-react';
 import {
   Dialog,
@@ -60,6 +62,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function AssetRegisterPage() {
   const { user, apiClient } = useAuth() as any;
   const { toast } = useToast();
+  const { employees, fetchEmployees } = useHR();
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [categories, setCategories] = useState<AssetCategory[]>([]);
@@ -75,6 +78,25 @@ export default function AssetRegisterPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [assignFormData, setAssignFormData] = useState<AssignAssetData>({
+    employee_id: '',
+    assigned_date: new Date().toISOString().split('T')[0],
+    return_date: '',
+    notes: ''
+  });
+  const [isUnassignDialogOpen, setIsUnassignDialogOpen] = useState(false);
+  const [unassignFormData, setUnassignFormData] = useState<UnassignAssetData & { return_condition: string }>({
+    return_date: new Date().toISOString().split('T')[0],
+    return_condition: 'good',
+    notes: ''
+  });
+  const [isDisposeDialogOpen, setIsDisposeDialogOpen] = useState(false);
+  const [disposeFormData, setDisposeFormData] = useState({
+    disposal_date: new Date().toISOString().split('T')[0],
+    disposal_reason: '',
+    disposal_value: 0
+  });
 
   const generateUniqueAssetTag = () => {
     const timestamp = Date.now().toString().slice(-6);
@@ -98,6 +120,7 @@ export default function AssetRegisterPage() {
   useEffect(() => {
     if (user?.company_id) {
       fetchData();
+      fetchEmployees();
     }
   }, [user?.company_id, statusFilter, categoryFilter]);
 
@@ -224,8 +247,10 @@ export default function AssetRegisterPage() {
     }
   };
 
-  const handleDeleteAsset = async (assetId: string) => {
-    if (!confirm('Are you sure you want to delete this asset?')) return;
+  const handleDisposeAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedAsset) return;
 
     if (!user?.company_id) {
       toast({
@@ -237,20 +262,179 @@ export default function AssetRegisterPage() {
     }
 
     try {
-      await apiClient.delete(`/assets/assets/${assetId}`);
-      setAssets(prev => prev.filter(asset => asset.id !== assetId));
+      setFormLoading(true);
+      await apiClient.post(`/assets/assets/${selectedAsset.id}/dispose`, disposeFormData);
+      
+      // Update the asset status to disposed
+      setAssets(prev => prev.map(asset => 
+        asset.id === selectedAsset.id ? { ...asset, status: 'disposed' } : asset
+      ));
+      
+      setIsDisposeDialogOpen(false);
+      setSelectedAsset(null);
+      setDisposeFormData({
+        disposal_date: new Date().toISOString().split('T')[0],
+        disposal_reason: '',
+        disposal_value: 0
+      });
+      
       toast({
         title: "Success",
-        description: "Asset deleted successfully"
+        description: "Asset disposed successfully"
       });
     } catch (error: any) {
-      console.error('Error deleting asset:', error);
+      console.error('Error disposing asset:', error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to delete asset",
+        description: error.response?.data?.message || "Failed to dispose asset",
         variant: "destructive"
       });
+    } finally {
+      setFormLoading(false);
     }
+  };
+
+  const handleAssignAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedAsset) return;
+
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      const response = await apiClient.post(`/assets/assignments/${selectedAsset.id}`, assignFormData);
+      
+      // Update the asset status to assigned
+      setAssets(prev => prev.map(asset => 
+        asset.id === selectedAsset.id ? { ...asset, status: 'assigned' } : asset
+      ));
+      
+      setIsAssignDialogOpen(false);
+      setSelectedAsset(null);
+      setAssignFormData({
+        employee_id: '',
+        assigned_date: new Date().toISOString().split('T')[0],
+        return_date: '',
+        notes: ''
+      });
+      
+      toast({
+        title: "Success",
+        description: "Asset assigned successfully"
+      });
+    } catch (error: any) {
+      console.error('Error assigning asset:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to assign asset",
+        variant: "destructive"
+      });
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleUnassignAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedAsset) return;
+
+    if (!user?.company_id) {
+      toast({
+        title: "Error",
+        description: "No company ID available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      const response = await apiClient.post(`/assets/assignments/${selectedAsset.id}/unassign`, unassignFormData);
+      
+      // Update the asset status to available
+      setAssets(prev => prev.map(asset => 
+        asset.id === selectedAsset.id ? { ...asset, status: 'available' } : asset
+      ));
+      
+      setIsUnassignDialogOpen(false);
+      setSelectedAsset(null);
+      setUnassignFormData({
+        return_date: new Date().toISOString().split('T')[0],
+        return_condition: 'good',
+        notes: ''
+      });
+      
+      toast({
+        title: "Success",
+        description: "Asset unassigned successfully"
+      });
+    } catch (error: any) {
+      console.error('Error unassigning asset:', error);
+      
+      // Handle the specific case where no active assignment is found
+      if (error.response?.data?.message?.includes('No active assignment found')) {
+        // Update the asset status to available since it's not actually assigned
+        setAssets(prev => prev.map(asset => 
+          asset.id === selectedAsset.id ? { ...asset, status: 'available' } : asset
+        ));
+        
+        setIsUnassignDialogOpen(false);
+        setSelectedAsset(null);
+        
+        toast({
+          title: "Info",
+          description: "Asset status updated to available (no active assignment found)"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.response?.data?.message || "Failed to unassign asset",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const openAssignDialog = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setAssignFormData({
+      employee_id: '',
+      assigned_date: new Date().toISOString().split('T')[0],
+      return_date: '',
+      notes: ''
+    });
+    setIsAssignDialogOpen(true);
+  };
+
+  const openUnassignDialog = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setUnassignFormData({
+      return_date: new Date().toISOString().split('T')[0],
+      return_condition: 'good',
+      notes: ''
+    });
+    setIsUnassignDialogOpen(true);
+  };
+
+  const openDisposeDialog = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setDisposeFormData({
+      disposal_date: new Date().toISOString().split('T')[0],
+      disposal_reason: '',
+      disposal_value: 0
+    });
+    setIsDisposeDialogOpen(true);
   };
 
   const openEditDialog = (asset: Asset) => {
@@ -606,43 +790,34 @@ export default function AssetRegisterPage() {
             <div className="grid gap-6">
               {paginatedAssets.map((asset) => (
               <Card key={asset.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-4 mb-4">
+                      <div className="flex items-center justify-between mb-2">
                         <div>
-                          <h3 className="text-lg font-semibold">{asset.name}</h3>
-                          <p className="text-sm text-gray-500">#{asset.asset_tag}</p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Badge className={`${getStatusBadgeColor(asset.status)} border-0`}>
-                            {asset.status.replace('_', ' ').toUpperCase()}
-                          </Badge>
+                          <h3 className="text-base font-semibold">{asset.name}</h3>
+                          <p className="text-xs text-gray-500">#{asset.asset_tag}</p>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center space-x-2">
-                          <Tag className="h-4 w-4 text-gray-400" />
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                        <div className="flex items-center space-x-1">
+                          <Tag className="h-3 w-3 text-gray-400" />
                           <span>{asset.category?.name || 'No Category'}</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <DollarSign className="h-4 w-4 text-gray-400" />
+                        <div className="flex items-center space-x-1">
+                          <DollarSign className="h-3 w-3 text-gray-400" />
                           <span>${asset.purchase_cost.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-gray-400" />
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="h-3 w-3 text-gray-400" />
                           <span>{new Date(asset.purchase_date).toLocaleDateString()}</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-4 w-4 text-gray-400" />
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-3 w-3 text-gray-400" />
                           <span>{asset.location || 'No Location'}</span>
                         </div>
                       </div>
-                      
-                      {asset.notes && (
-                        <p className="text-sm text-gray-600 mt-3">{asset.notes}</p>
-                      )}
                     </div>
                     
                     <DropdownMenu>
@@ -657,21 +832,24 @@ export default function AssetRegisterPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Asset
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <QrCode className="mr-2 h-4 w-4" />
-                          Generate QR Code
-                        </DropdownMenuItem>
+                        {asset.status === 'available' ? (
+                          <DropdownMenuItem onClick={() => openAssignDialog(asset)}>
+                            <User className="mr-2 h-4 w-4" />
+                            Assign Asset
+                          </DropdownMenuItem>
+                        ) : asset.status === 'assigned' ? (
+                          <DropdownMenuItem onClick={() => openUnassignDialog(asset)}>
+                            <User className="mr-2 h-4 w-4" />
+                            Unassign Asset
+                          </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          onClick={() => handleDeleteAsset(asset.id)}
+                          onClick={() => openDisposeDialog(asset)}
                           className="text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Asset
+                          Dispose Asset
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -840,6 +1018,205 @@ export default function AssetRegisterPage() {
                 <Button type="submit" disabled={formLoading}>
                   {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Update Asset
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Asset Dialog */}
+        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Assign Asset</DialogTitle>
+              <DialogDescription>
+                Assign this asset to an employee with assignment details.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAssignAsset}>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="employee_id">Employee</Label>
+                  <Select
+                    value={assignFormData.employee_id}
+                    onValueChange={(value) => setAssignFormData(prev => ({ ...prev, employee_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.first_name} {employee.last_name} - {employee.position}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="assigned_date">Assignment Date</Label>
+                    <Input
+                      id="assigned_date"
+                      type="date"
+                      value={assignFormData.assigned_date}
+                      onChange={(e) => setAssignFormData(prev => ({ ...prev, assigned_date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="return_date">Expected Return Date</Label>
+                    <Input
+                      id="return_date"
+                      type="date"
+                      value={assignFormData.return_date}
+                      onChange={(e) => setAssignFormData(prev => ({ ...prev, return_date: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="assign_notes">Notes</Label>
+                  <Textarea
+                    id="assign_notes"
+                    value={assignFormData.notes}
+                    onChange={(e) => setAssignFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="Optional notes about the assignment..."
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={formLoading}>
+                  {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Assign Asset
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Unassign Asset Dialog */}
+        <Dialog open={isUnassignDialogOpen} onOpenChange={setIsUnassignDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Unassign Asset</DialogTitle>
+              <DialogDescription>
+                Return this asset and update its status.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUnassignAsset}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="unassign_return_date">Return Date</Label>
+                    <Input
+                      id="unassign_return_date"
+                      type="date"
+                      value={unassignFormData.return_date}
+                      onChange={(e) => setUnassignFormData(prev => ({ ...prev, return_date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="return_condition">Return Condition</Label>
+                    <Select
+                      value={unassignFormData.return_condition}
+                      onValueChange={(value) => setUnassignFormData(prev => ({ ...prev, return_condition: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="good">Good</SelectItem>
+                        <SelectItem value="unusable">Unusable</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="unassign_notes">Notes</Label>
+                  <Textarea
+                    id="unassign_notes"
+                    value={unassignFormData.notes}
+                    onChange={(e) => setUnassignFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="Optional notes about the return..."
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setIsUnassignDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={formLoading}>
+                  {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Unassign Asset
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dispose Asset Dialog */}
+        <Dialog open={isDisposeDialogOpen} onOpenChange={setIsDisposeDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Dispose Asset</DialogTitle>
+              <DialogDescription>
+                Dispose of this asset and record disposal details.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleDisposeAsset}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="disposal_date">Disposal Date</Label>
+                    <Input
+                      id="disposal_date"
+                      type="date"
+                      value={disposeFormData.disposal_date}
+                      onChange={(e) => setDisposeFormData(prev => ({ ...prev, disposal_date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="disposal_value">Disposal Value</Label>
+                    <Input
+                      id="disposal_value"
+                      type="number"
+                      step="0.01"
+                      value={disposeFormData.disposal_value}
+                      onChange={(e) => setDisposeFormData(prev => ({ ...prev, disposal_value: parseFloat(e.target.value) || 0 }))}
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="disposal_reason">Disposal Reason</Label>
+                  <Textarea
+                    id="disposal_reason"
+                    value={disposeFormData.disposal_reason}
+                    onChange={(e) => setDisposeFormData(prev => ({ ...prev, disposal_reason: e.target.value }))}
+                    rows={3}
+                    placeholder="e.g., End of useful life, Damaged beyond repair, Obsolete technology..."
+                    required
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setIsDisposeDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={formLoading} className="bg-red-600 hover:bg-red-700">
+                  {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Dispose Asset
                 </Button>
               </DialogFooter>
             </form>

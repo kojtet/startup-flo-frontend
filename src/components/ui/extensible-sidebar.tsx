@@ -80,7 +80,20 @@ export function ExtensibleSidebar({
               )}
               <ul className={cn("space-y-1", isMainSidebar && "space-y-2")}>
                 {section.items.map((item, itemIndex) => {
-                  const isActive = router.asPath === item.href || router.asPath.startsWith(item.href + '/');
+                  // Improved route matching logic for exact paths
+                  let isActive = false;
+                  
+                  if (item.href === '/') {
+                    // Home route - only active if exactly on home
+                    isActive = router.asPath === '/';
+                  } else if (item.href === '/assets') {
+                    // Assets overview - only active if exactly on /assets
+                    isActive = router.asPath === '/assets';
+                  } else {
+                    // Other routes - exact match or starts with (for nested routes)
+                    isActive = router.asPath === item.href || router.asPath.startsWith(item.href + '/');
+                  }
+                  
                   // console.log(`Route check: ${router.asPath} === ${item.href} = ${isActive}`);
                   const Icon = item.icon;
                   

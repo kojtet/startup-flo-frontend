@@ -4,6 +4,7 @@ import { AuthProvider } from './AuthContext';
 import { SubscriptionProvider } from './SubscriptionContext';
 import { CompanyProvider } from './CompanyContext';
 import { UserProvider } from './UserContext';
+import { TimeFenceProvider } from './TimeFenceContext';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -21,7 +22,9 @@ export function AppProviders({ children }: AppProvidersProps) {
         <UserProvider>
           <CompanyProvider>
             <SubscriptionProvider>
-              {children}
+              <TimeFenceProvider>
+                {children}
+              </TimeFenceProvider>
             </SubscriptionProvider>
           </CompanyProvider>
         </UserProvider>

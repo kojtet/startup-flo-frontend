@@ -20,10 +20,17 @@ import {
   // GanttChartSquare, // Unused import
   // Settings, // Unused
   // LifeBuoy, // Unused
+  LayoutDashboard, // Added for Overview
 } from "lucide-react";
 import { SidebarSection } from "@/components/ui/extensible-sidebar";
 
 export const hrSidebarSections: SidebarSection[] = [
+  {
+    title: "Overview",
+    items: [
+      { label: "HR Dashboard", href: "/hr", icon: LayoutDashboard },
+    ]
+  },
   {
     title: "People & Organization",
     items: [

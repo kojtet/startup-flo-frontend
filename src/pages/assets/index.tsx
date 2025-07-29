@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Asset, AssetCategory } from "@/apis/types";
+import type { Asset, AssetCategory, CreateAssetData } from "@/apis/types";
 import { Archive, DollarSign, Wrench, TrendingDown, Loader2, Building, AlertTriangle, CheckCircle, Clock, AlertCircle, Plus, RefreshCw } from "lucide-react";
 
 export default function AssetsDashboard() {
@@ -24,19 +24,22 @@ export default function AssetsDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const generateUniqueAssetTag = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `AST${timestamp}${random}`;
+  };
+
+  const [formData, setFormData] = useState<CreateAssetData>({
     name: '',
     category_id: '',
     serial_number: '',
     purchase_date: '',
     purchase_cost: 0,
-    status: 'active' as Asset['status'],
-    location: '',
-    description: '',
-    warranty_expiry: '',
-    depreciation_method: 'straight_line' as 'straight_line' | 'declining_balance' | 'sum_of_years',
-    useful_life_years: 4,
-    asset_tag: '',
+    status: 'available',
+    location: 'Default Location',
+    notes: '',
+    asset_tag: generateUniqueAssetTag(),
     depreciation_start: ''
   });
 
@@ -62,7 +65,7 @@ export default function AssetsDashboard() {
       // Fetch data in parallel for better performance
       const [assetsResponse, categoriesResponse] = await Promise.all([
         apiClient.get('/assets/assets'),
-        apiClient.get('/asset/categories'),
+        apiClient.get('/assets/categories'),
       ]);
 
       setAssets(assetsResponse.data || []);
@@ -106,13 +109,10 @@ export default function AssetsDashboard() {
       serial_number: '',
       purchase_date: '',
       purchase_cost: 0,
-      status: 'active',
-      location: '',
-      description: '',
-      warranty_expiry: '',
-      depreciation_method: 'straight_line',
-      useful_life_years: 4,
-      asset_tag: '',
+      status: 'available',
+      location: 'Default Location',
+      notes: '',
+      asset_tag: generateUniqueAssetTag(),
       depreciation_start: ''
     });
   };
@@ -134,8 +134,7 @@ export default function AssetsDashboard() {
       
       const assetPayload = {
         ...formData,
-        purchase_cost: parseFloat(formData.purchase_cost.toString()),
-        useful_life_years: parseInt(formData.useful_life_years.toString())
+        purchase_cost: parseFloat(formData.purchase_cost.toString())
       };
 
       await apiClient.post('/assets/assets', assetPayload);
@@ -207,10 +206,11 @@ export default function AssetsDashboard() {
   const getStatusBadgeColor = (status: Asset['status']) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
-      case 'in_stock': return 'bg-blue-100 text-blue-800';
+      case 'available': return 'bg-blue-100 text-blue-800';
       case 'assigned': return 'bg-purple-100 text-purple-800';
       case 'maintenance': return 'bg-yellow-100 text-yellow-800';
-      case 'retired': return 'bg-gray-100 text-gray-800';
+      case 'retired': return 'bg-orange-100 text-orange-800';
+      case 'disposed': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -218,10 +218,11 @@ export default function AssetsDashboard() {
   const getStatusIcon = (status: Asset['status']) => {
     switch (status) {
       case 'active': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'in_stock': return <Archive className="h-4 w-4 text-blue-500" />;
+      case 'available': return <Archive className="h-4 w-4 text-blue-500" />;
       case 'assigned': return <Building className="h-4 w-4 text-purple-500" />;
       case 'maintenance': return <Wrench className="h-4 w-4 text-yellow-500" />;
-      case 'retired': return <AlertTriangle className="h-4 w-4 text-gray-500" />;
+      case 'retired': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case 'disposed': return <AlertTriangle className="h-4 w-4 text-red-500" />;
       default: return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
@@ -230,40 +231,45 @@ export default function AssetsDashboard() {
     <form onSubmit={handleCreateAsset} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name">Asset Name *</Label>
+          <Label htmlFor="name">Asset Name</Label>
           <Input
             id="name"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
             required
-            placeholder="e.g., MacBook Pro 2024"
           />
         </div>
         <div>
-          <Label htmlFor="asset_tag">Asset Tag *</Label>
-          <Input
-            id="asset_tag"
-            value={formData.asset_tag}
-            onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
-            required
-            placeholder="e.g., SDG3223"
-          />
+          <Label htmlFor="asset_tag">Asset Tag</Label>
+          <div className="flex gap-2">
+            <Input
+              id="asset_tag"
+              value={formData.asset_tag}
+              onChange={(e) => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
+              required
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, asset_tag: generateUniqueAssetTag() }))}
+              title="Generate unique asset tag"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="category_id">Category *</Label>
-          <Select 
-            value={formData.category_id} 
+          <Label htmlFor="category_id">Category</Label>
+          <Select
+            value={formData.category_id}
             onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
-            required
           >
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              {categories.map(category => (
+              {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
                 </SelectItem>
@@ -272,20 +278,35 @@ export default function AssetsDashboard() {
           </Select>
         </div>
         <div>
-          <Label htmlFor="serial_number">Serial Number *</Label>
+          <Label htmlFor="serial_number">Serial Number</Label>
           <Input
             id="serial_number"
             value={formData.serial_number}
             onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))}
-            required
-            placeholder="e.g., MBP2024-123456"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="purchase_date">Purchase Date *</Label>
+          <Label htmlFor="status">Status</Label>
+          <Select
+            value={formData.status}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Asset['status'] }))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="assigned">Assigned</SelectItem>
+              <SelectItem value="maintenance">Under Maintenance</SelectItem>
+              <SelectItem value="retired">Retired</SelectItem>
+              <SelectItem value="disposed">Disposed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="purchase_date">Purchase Date</Label>
           <Input
             id="purchase_date"
             type="date"
@@ -295,111 +316,23 @@ export default function AssetsDashboard() {
           />
         </div>
         <div>
-          <Label htmlFor="purchase_cost">Purchase Cost *</Label>
+          <Label htmlFor="purchase_cost">Purchase Cost</Label>
           <Input
             id="purchase_cost"
             type="number"
-            min="0"
             step="0.01"
             value={formData.purchase_cost}
             onChange={(e) => setFormData(prev => ({ ...prev, purchase_cost: parseFloat(e.target.value) || 0 }))}
             required
-            placeholder="0.00"
           />
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="status">Status *</Label>
-          <Select 
-            value={formData.status} 
-            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Asset['status'] }))}
-            required
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="in_stock">In Stock</SelectItem>
-              <SelectItem value="assigned">Assigned</SelectItem>
-              <SelectItem value="maintenance">Maintenance</SelectItem>
-              <SelectItem value="retired">Retired</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="location">Location *</Label>
-          <Input
-            id="location"
-            value={formData.location}
-            onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-            required
-            placeholder="e.g., Office A"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="warranty_expiry">Warranty Expiry</Label>
-          <Input
-            id="warranty_expiry"
-            type="date"
-            value={formData.warranty_expiry}
-            onChange={(e) => setFormData(prev => ({ ...prev, warranty_expiry: e.target.value }))}
-          />
-        </div>
-        <div>
-          <Label htmlFor="depreciation_start">Depreciation Start Date</Label>
-          <Input
-            id="depreciation_start"
-            type="date"
-            value={formData.depreciation_start}
-            onChange={(e) => setFormData(prev => ({ ...prev, depreciation_start: e.target.value }))}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="depreciation_method">Depreciation Method</Label>
-          <Select 
-            value={formData.depreciation_method} 
-            onValueChange={(value) => setFormData(prev => ({ ...prev, depreciation_method: value as 'straight_line' | 'declining_balance' | 'sum_of_years' }))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="straight_line">Straight Line</SelectItem>
-              <SelectItem value="declining_balance">Declining Balance</SelectItem>
-              <SelectItem value="sum_of_years">Sum of Years</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="useful_life_years">Useful Life (Years)</Label>
-          <Input
-            id="useful_life_years"
-            type="number"
-            min="1"
-            max="50"
-            value={formData.useful_life_years}
-            onChange={(e) => setFormData(prev => ({ ...prev, useful_life_years: parseInt(e.target.value) || 4 }))}
-            placeholder="4"
-          />
-        </div>
-      </div>
-
       <div>
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="notes">Notes</Label>
         <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          placeholder="Describe the asset..."
+          id="notes"
+          value={formData.notes}
+          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
           rows={3}
         />
       </div>
@@ -468,9 +401,12 @@ export default function AssetsDashboard() {
                   Add Asset
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Create New Asset</DialogTitle>
+                  <DialogDescription>
+                    Add a new asset to the register with all necessary details.
+                  </DialogDescription>
                 </DialogHeader>
                 <AssetForm />
               </DialogContent>
